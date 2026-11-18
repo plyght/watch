@@ -114,7 +114,7 @@ const Svg = struct {
             }
         }
         s.w("' fill='url(#{s})'/>", .{m.id});
-        s.w("<circle r='{d:.3}' fill='#0b0b0e'/>", .{r * 0.72});
+        s.w("<circle r='{d:.3}' fill='#3a2706'/>", .{r * 0.72});
         i = 0;
         while (i < 5) : (i += 1) {
             const p = polar(72.0 * @as(f32, @floatFromInt(i)), r * 0.78);
@@ -150,12 +150,12 @@ const Svg = struct {
     /// A skeleton movement seen from the front, filling a circle of radius r.
     fn movement(s: *Svg, c: P, r: f32) void {
         s.w("<g transform='translate({d:.3} {d:.3})'>\n", .{ c[0], c[1] });
-        s.circle(.{ 0, 0 }, r, "fill='#101014'");
+        s.circle(.{ 0, 0 }, r, "fill='url(#brass)'");
         var i: u32 = 1;
-        while (i < 9) : (i += 1) s.circle(.{ 0, 0 }, r * @as(f32, @floatFromInt(i)) / 9.0, "fill='none' stroke='#ffffff' stroke-opacity='0.05' stroke-width='0.08'");
-        s.gear(.{ -0.34 * r, -0.36 * r }, 0.44 * r, 44, 3, brass);
-        s.gear(.{ 0.42 * r, -0.40 * r }, 0.27 * r, 28, 10, brass);
-        s.gear(.{ 0.10 * r, 0.02 * r }, 0.30 * r, 30, 0, brass);
+        while (i < 9) : (i += 1) s.circle(.{ 0, 0 }, r * @as(f32, @floatFromInt(i)) / 9.0, "fill='none' stroke='#5a3d0a' stroke-opacity='0.35' stroke-width='0.1'");
+        s.gear(.{ -0.34 * r, -0.36 * r }, 0.44 * r, 44, 3, bronze);
+        s.gear(.{ 0.42 * r, -0.40 * r }, 0.27 * r, 28, 10, steel);
+        s.gear(.{ 0.10 * r, 0.02 * r }, 0.30 * r, 30, 0, bronze);
         s.gear(.{ 0.52 * r, 0.22 * r }, 0.22 * r, 22, 7, steel);
         s.gear(.{ 0.16 * r, 0.56 * r }, 0.17 * r, 15, 2, steel);
         s.balance(.{ -0.44 * r, 0.42 * r }, 0.30 * r, brass);
@@ -198,17 +198,6 @@ const Svg = struct {
         }
     }
 
-    fn lugs(s: *Svg, m: Metal) void {
-        for ([_]f32{ 1, -1 }) |sx| {
-            for ([_]f32{ 1, -1 }) |sy| {
-                const pts = [_]P{ .{ sx * 10.2, sy * 13.0 }, .{ sx * 15.8, sy * 12.0 }, .{ sx * 15.2, sy * 25.2 }, .{ sx * 10.2, sy * 26.6 } };
-                s.w("<polygon points='", .{});
-                for (pts) |p| s.w("{d:.3},{d:.3} ", .{ p[0], p[1] });
-                s.w("' fill='url(#{s}_h)' filter='url(#sh)'/>\n", .{m.id});
-            }
-        }
-    }
-
     fn caption(s: *Svg, color: []const u8, soft: []const u8, number: []const u8, name: []const u8, l1: []const u8, l2: []const u8) void {
         s.w("<text x='-30' y='-33.5' font-family='Inter, sans-serif' font-size='2.2' fill='{s}'>{s}</text>\n", .{ soft, number });
         s.w("<text x='-30' y='-29' font-family='Inter Display, Inter, sans-serif' font-weight='700' font-size='4.4' letter-spacing='-0.1' fill='{s}'>{s}</text>\n", .{ color, name });
@@ -217,228 +206,193 @@ const Svg = struct {
     }
 };
 
-// ------------------------------------------------------------------ concepts
+// ------------------------------------------------------------------ the dial
 
-/// 01 VAULT: a safe door on the wrist.
-fn vault(s: *Svg) void {
-    s.begin("#17181b", &.{ steel, gun, brass });
-    s.strap("#050506", "#1d1e22", false);
-    s.lugs(gun);
-    // Three locking bolts thrown out of the case side; the middle one is the crown.
-    for ([_]f32{ -7.2, 0, 7.2 }) |y| {
-        const long: f32 = if (y == 0) 5.2 else 3.4;
-        s.w("<rect x='19' y='{d:.3}' width='{d:.3}' height='3.6' rx='0.5' fill='url(#brass_h)' transform='rotate(90 {d:.3} {d:.3}) rotate(-90 {d:.3} {d:.3})' filter='url(#sh)'/>\n", .{ y - 1.8, long, 0.0, 0.0, 0.0, 0.0 });
+/// SHATTER dial: the semicentric emblem cut clean through the dial plate, so
+/// the mechanism shows through the five shard-shaped windows. `r` is the dial
+/// radius; the emblem is centred and fills about 90% of the width.
+fn shatterDial(s: *Svg, r: f32) void {
+    const centre = P{ 256.0, 256.0 }; // middle of the emblem's bounding box
+    const k = r * 1.8 / 430.0;
+
+    s.circle(.{ 0, 0 }, r + 0.45, "fill='url(#steel_r)'");
+    s.movement(.{ 0, 0 }, r);
+
+    s.w("<defs><radialGradient id='plate' cx='0.3' cy='0.52' r='0.8'><stop offset='0' stop-color='#26272c'/><stop offset='1' stop-color='#050506'/></radialGradient><clipPath id='dialclip'><circle r='{d:.3}'/></clipPath></defs>\n", .{r});
+    s.w("<path fill-rule='evenodd' fill='url(#plate)' filter='url(#sh)' d='M{d:.3} 0 A{d:.3} {d:.3} 0 1 0 {d:.3} 0 A{d:.3} {d:.3} 0 1 0 {d:.3} 0 Z", .{ -r, r, r, r, r, r, -r });
+    for (shards) |shard| {
+        for (shard, 0..) |p, n| s.w(" {s}{d:.3} {d:.3}", .{ if (n == 0) "M" else "L", (p[0] - centre[0]) * k, (p[1] - centre[1]) * k });
+        s.w(" Z", .{});
     }
-    s.circle(.{ 0, 0 }, 21.0, "fill='url(#gun)' filter='url(#sh)'");
-    s.circle(.{ 0, 0 }, 20.2, "fill='url(#gun_r)'");
-    s.circle(.{ 0, 0 }, 16.6, "fill='url(#gun)'");
-    // Door bolts around the bezel.
-    var i: u32 = 0;
-    while (i < 8) : (i += 1) {
-        const c = polar(22.5 + 45.0 * @as(f32, @floatFromInt(i)), 18.4);
-        s.circle(c, 1.35, "fill='url(#brass)' filter='url(#sh2)'");
-        var hex: [6]P = undefined;
-        for (&hex, 0..) |*h, k| {
-            const p = polar(60.0 * @as(f32, @floatFromInt(k)) + 15.0, 0.78);
-            h.* = .{ c[0] + p[0], c[1] + p[1] };
+    s.w("'/>\n", .{});
+
+    // Hairline fractures running on from each shard's tip to the edge.
+    s.w("<g clip-path='url(#dialclip)'>\n", .{});
+    const fx = (focal[0] - centre[0]) * k;
+    const fy = (focal[1] - centre[1]) * k;
+    for (shards) |shard| {
+        var best: f32 = 0;
+        var tip = P{ 0, 0 };
+        for (shard) |p| {
+            const x = (p[0] - centre[0]) * k;
+            const y = (p[1] - centre[1]) * k;
+            const d = (x - fx) * (x - fx) + (y - fy) * (y - fy);
+            if (d > best) {
+                best = d;
+                tip = .{ x, y };
+            }
         }
-        s.poly(&hex, "fill='url(#brass_r)'");
+        const len = @sqrt(best);
+        s.line(tip, .{ tip[0] + (tip[0] - fx) / len * 40.0, tip[1] + (tip[1] - fy) / len * 40.0 }, "stroke='#9aa0a8' stroke-opacity='0.55' stroke-width='0.07'");
     }
-    s.text(.{ 0, 18.75 }, 1.05, "SEMICENTRIC", "font-family='Inter, sans-serif' font-weight='600' letter-spacing='0.35' text-anchor='middle' fill='#9ba0a9'");
-    // Combination ring, numbered like a safe dial.
-    s.circle(.{ 0, 0 }, 16.2, "fill='#08080a'");
-    s.ticks(100, 16.0, 15.4, 0, "stroke='#d8d8d4' stroke-width='0.09'");
-    s.ticks(100, 16.0, 14.9, 5, "stroke='#f4f4f0' stroke-width='0.13'");
-    s.ticks(100, 16.0, 14.5, 10, "stroke='#ffffff' stroke-width='0.2'");
-    i = 0;
-    while (i < 10) : (i += 1) {
+    s.w("</g>\n", .{});
+
+    // Polished chamfer around every cut.
+    s.w("<g transform='translate({d:.3} {d:.3})' fill='none' stroke-linejoin='miter'>\n", .{ -centre[0] * k, -centre[1] * k });
+    for (shards) |shard| {
+        for ([_][2][]const u8{ .{ "url(#steel)", "0.16" }, .{ "#0a0a0c", "0.04" } }) |pass| {
+            s.w("<polygon points='", .{});
+            for (shard) |p| s.w("{d:.3},{d:.3} ", .{ p[0] * k, p[1] * k });
+            s.w("' stroke='{s}' stroke-width='{s}'/>\n", .{ pass[0], pass[1] });
+        }
+    }
+    s.w("</g>\n", .{});
+
+    s.ticks(60, r - 0.35, r - 0.95, 0, "stroke='#d9dbdf' stroke-width='0.09'");
+    // Baton markers; 3 and 9 are left out because the emblem reaches the edge there.
+    var h: u32 = 0;
+    while (h < 12) : (h += 1) {
+        if (h == 3 or h == 9) continue;
+        s.line(polar(30.0 * @as(f32, @floatFromInt(h)), r - 0.45), polar(30.0 * @as(f32, @floatFromInt(h)), r - 2.5), "stroke='url(#steel)' stroke-width='0.75' filter='url(#sh2)'");
+    }
+    s.text(.{ r * 0.22, r * 0.62 }, r * 0.082, "semicentric", "font-family='Inter Display, Inter, sans-serif' font-weight='600' fill='#e9e9e6'");
+    s.hand(.{ 0, 0 }, 305, r * 0.52, r * 0.12, r * 0.13, steel);
+    s.hand(.{ 0, 0 }, 48, r * 0.82, r * 0.14, r * 0.1, steel);
+    s.needle(.{ 0, 0 }, 196, r * 0.88, r * 0.22, "#ff4a26");
+}
+
+// ------------------------------------------------------------------ case shapes
+
+/// Three-link metal bracelet running from y0 to the edge of the sheet on both
+/// sides, tapering from w0 to w1.
+fn bracelet(s: *Svg, m: Metal, w0: f32, w1: f32, y0: f32) void {
+    for ([_]f32{ 1, -1 }) |sy| {
+        s.w("<g transform='scale(1 {d})' filter='url(#sh)'>\n", .{sy});
+        var row: u32 = 0;
+        while (row < 5) : (row += 1) {
+            const t = @min(1.0, @as(f32, @floatFromInt(row)) / 5.0);
+            const half = (w0 + (w1 - w0) * t) / 2.0;
+            const y = y0 + 3.9 * @as(f32, @floatFromInt(row));
+            s.w("<rect x='{d:.3}' y='{d:.3}' width='{d:.3}' height='3.7' rx='0.5' fill='url(#{s}_h)' stroke='#0b0c0e' stroke-width='0.1'/>\n", .{ -half, y, half * 2.0, m.id });
+            s.w("<rect x='{d:.3}' y='{d:.3}' width='{d:.3}' height='3.7' rx='0.5' fill='url(#{s})' stroke='#0b0c0e' stroke-width='0.1'/>\n", .{ -half * 0.42, y + 1.95, half * 0.84, m.id });
+        }
+        s.w("</g>\n", .{});
+    }
+}
+
+fn crown(s: *Svg, m: Metal, deg: f32, r: f32, len: f32, width: f32) void {
+    s.w("<g transform='rotate({d:.1})' filter='url(#sh)'><rect x='{d:.3}' y='{d:.3}' width='{d:.3}' height='{d:.3}' rx='0.5' fill='url(#{s}_r)'/>", .{ deg - 90.0, r, -width / 2.0, len, width, m.id });
+    var n: u32 = 1;
+    while (n < 6) : (n += 1) {
+        const y = -width / 2.0 + width * @as(f32, @floatFromInt(n)) / 6.0;
+        s.w("<line x1='{d:.3}' y1='{d:.3}' x2='{d:.3}' y2='{d:.3}' stroke='#0b0c0e' stroke-opacity='0.5' stroke-width='0.12'/>", .{ r + 0.5, y, r + len - 0.2, y });
+    }
+    s.w("</g>\n", .{});
+}
+
+/// A: classic dive-watch shape, like "Your Lucky Day".
+fn caseDiver(s: *Svg) void {
+    s.begin("#e9e9e6", &.{ steel, gun, brass, bronze });
+    bracelet(s, steel, 20.0, 17.5, 23.6);
+    for ([_]f32{ 1, -1 }) |sx| {
+        for ([_]f32{ 1, -1 }) |sy| {
+            s.w("<path transform='scale({d} {d})' d='M9.9 12 L9.9 25.2 Q11.4 26 12.9 25.3 Q14.6 18.5 17.4 10.5 Z' fill='url(#steel_h)' filter='url(#sh)'/>\n", .{ sx, sy });
+        }
+    }
+    s.w("<path d='M19 -6.2 Q24.2 -5.6 24.2 -3 L24.2 3 Q24.2 5.6 19 6.2 Z' fill='url(#steel)' filter='url(#sh)'/>\n", .{});
+    crown(s, steel, 90, 22.4, 4.2, 4.6);
+    s.circle(.{ 0, 0 }, 20.6, "fill='url(#steel)' filter='url(#sh)'");
+    s.ticks(120, 20.5, 19.2, 0, "stroke='#3c4047' stroke-width='0.3'");
+    s.circle(.{ 0, 0 }, 19.2, "fill='#0b0c0f'");
+    s.ticks(60, 18.6, 17.9, 0, "stroke='#aeb3bb' stroke-width='0.12'");
+    for ([_]u32{ 10, 20, 30, 40, 50 }) |n| {
         var buf: [4]u8 = undefined;
-        const label = std.fmt.bufPrint(&buf, "{d}", .{i * 10}) catch unreachable;
-        s.ringText(36.0 * @as(f32, @floatFromInt(i)), 13.45, 1.55, label, "font-family='Inter, sans-serif' font-weight='600' fill='#f4f4f0'");
+        const label = std.fmt.bufPrint(&buf, "{d}", .{n}) catch unreachable;
+        s.ringText(6.0 * @as(f32, @floatFromInt(n)), 17.75, 1.9, label, "font-family='Inter, sans-serif' font-weight='600' fill='#d9dbdf'");
     }
-    // The emblem is the lock's index mark, pointing in at 12.
-    s.emblem(.{ 0, -20.7 }, 0.0125, 90, 0, "fill='#ff4a26'");
-    // Open centre: the mechanism behind the spoked handle.
-    s.circle(.{ 0, 0 }, 12.5, "fill='url(#gun_r)'");
-    s.movement(.{ 0, 0 }, 12.1);
-    s.circle(.{ 0, 0 }, 12.1, "fill='none' stroke='#000' stroke-opacity='0.55' stroke-width='0.5'");
-    // Vault handle: turns once a minute in place of a seconds hand.
-    s.w("<g transform='rotate(17)' filter='url(#sh)'>\n", .{});
-    s.circle(.{ 0, 0 }, 9.0, "fill='none' stroke='url(#brass)' stroke-width='1.05'");
-    i = 0;
-    while (i < 5) : (i += 1) {
-        const a = 72.0 * @as(f32, @floatFromInt(i));
-        s.line(.{ 0, 0 }, polar(a, 10.6), "stroke='url(#brass_h)' stroke-width='1.0' stroke-linecap='round'");
-        s.circle(polar(a, 10.9), 0.95, "fill='url(#brass)'");
-    }
-    s.circle(.{ 0, 0 }, 2.7, "fill='url(#brass)'");
-    s.w("</g>\n", .{});
-    s.hand(.{ 0, 0 }, 305, 7.6, 1.6, 2.0, steel);
-    s.hand(.{ 0, 0 }, 52, 11.6, 2.0, 1.6, steel);
-    s.circle(.{ 0, 0 }, 1.0, "fill='url(#steel)' stroke='#22252a' stroke-width='0.1'");
-    s.caption("#f4f4f0", "#8e939c", "CONCEPT 01", "VAULT", "Safe-door bezel, combination ring, handle that turns once a minute.", "Mechanism on show behind it. Miyota 8N24 skeleton. Gunmetal + brass.");
+    s.poly(&.{ .{ -1.2, -18.8 }, .{ 1.2, -18.8 }, .{ 0, -16.7 } }, "fill='#e9e9e6'");
+    shatterDial(s, 15.6);
+    s.caption("#101010", "#6a6d73", "CASE A", "DIVER", "Round case, flowing lugs, crown guards, rotating coin-edge bezel.", "Closest to Your Lucky Day. Steel bracelet.");
     s.end();
 }
 
-/// 02 SHATTER: the dial is broken open along the emblem.
-fn shatter(s: *Svg) void {
-    s.begin("#e9e9e6", &.{ steel, gun, brass });
-    s.strap("#1b1c1f", "#3a3c42", false);
-    s.lugs(steel);
-    s.w("<rect x='20' y='-2.4' width='4.6' height='4.8' rx='0.7' fill='url(#steel_h)' filter='url(#sh)'/>\n", .{});
-    s.circle(.{ 0, 0 }, 21.0, "fill='url(#steel)' filter='url(#sh)'");
-    // Twelve-sided bezel, each facet catching the light differently.
-    var i: u32 = 0;
-    while (i < 12) : (i += 1) {
-        const a = 30.0 * @as(f32, @floatFromInt(i)) - 15.0;
-        const shade = [_][]const u8{ "#f6f7f9", "#c9ced6", "#8e949d", "#5d626b", "#7b818a", "#b3b8c0" };
-        const tri = [_]P{ .{ 0, 0 }, polar(a, 20.6), polar(a + 30.0, 20.6) };
-        s.w("<polygon points='{d:.3},{d:.3} {d:.3},{d:.3} {d:.3},{d:.3}' fill='{s}'/>\n", .{ tri[0][0], tri[0][1], tri[1][0], tri[1][1], tri[2][0], tri[2][1], shade[(i + 5) % 6] });
-    }
-    s.circle(.{ 0, 0 }, 16.7, "fill='url(#steel_r)'");
-    s.movement(.{ 0, 0 }, 16.2);
-
-    // Dial plate with a jagged hole broken out around the focal point.
-    const hit = P{ -4.6, 2.4 };
-    const reach = [_]f32{ 10.5, 5.2, 12.5, 6.0, 9.0, 4.6, 11.5, 5.6, 8.8, 4.8, 13.0, 6.4 };
-    var hole: [12]P = undefined;
-    for (&hole, 0..) |*h, k| {
-        const p = polar(30.0 * @as(f32, @floatFromInt(k)) + 8.0, reach[k]);
-        var x = hit[0] + p[0];
-        var y = hit[1] + p[1];
-        const d = @sqrt(x * x + y * y);
-        if (d > 14.2) { // keep the break inside the minute track
-            x *= 14.2 / d;
-            y *= 14.2 / d;
+/// B: cushion case, a rounded square.
+fn caseCushion(s: *Svg) void {
+    s.begin("#1a1b1e", &.{ steel, gun, brass, bronze });
+    s.strap("#060607", "#232428", false);
+    for ([_]f32{ 1, -1 }) |sx| {
+        for ([_]f32{ 1, -1 }) |sy| {
+            s.w("<path transform='scale({d} {d})' d='M10.1 15 L10.1 24.6 Q12.6 25 14.6 23.6 L17.6 16 Z' fill='url(#gun_h)' filter='url(#sh)'/>\n", .{ sx, sy });
         }
-        h.* = .{ x, y };
     }
-    s.w("<path fill-rule='evenodd' fill='#0a0a0c' filter='url(#sh)' d='M-16.2 0 A16.2 16.2 0 1 0 16.2 0 A16.2 16.2 0 1 0 -16.2 0 Z M", .{});
-    for (hole) |h| s.w("{d:.3} {d:.3} L", .{ h[0], h[1] });
-    s.w("{d:.3} {d:.3} Z'/>\n", .{ hole[0][0], hole[0][1] });
-    s.poly(&hole, "fill='none' stroke='#9aa0a8' stroke-width='0.12' stroke-linejoin='miter'");
-    // Cracks running from the break out to the edge.
-    s.w("<defs><clipPath id='dialclip'><circle r='16.2'/></clipPath></defs><g clip-path='url(#dialclip)'>\n", .{});
-    for (hole, 0..) |h, k| {
-        if (k % 2 == 1) continue;
-        const dx = h[0] - hit[0];
-        const dy = h[1] - hit[1];
-        const d = @sqrt(dx * dx + dy * dy);
-        s.line(h, .{ h[0] + dx / d * 9.0, h[1] + dy / d * 9.0 }, "stroke='#6d727a' stroke-width='0.07'");
-    }
-    s.w("</g>\n", .{});
-    s.ticks(60, 15.9, 15.2, 0, "stroke='#e9e9e6' stroke-width='0.1'");
-    s.ticks(12, 15.9, 14.2, 0, "stroke='#ffffff' stroke-width='0.45'");
-    // The emblem's shards float over the break as polished bridges.
-    s.emblem(hit, 0.054, 0, 0.6, "fill='url(#steel)' stroke='#ffffff' stroke-width='0.08' filter='url(#sh)'");
-    s.text(.{ 3.2, 11.2 }, 1.25, "semicentric", "font-family='Inter Display, Inter, sans-serif' font-weight='600' fill='#e9e9e6'");
-    s.hand(.{ 0, 0 }, 300, 8.4, 1.8, 2.1, steel);
-    s.hand(.{ 0, 0 }, 48, 13.2, 2.2, 1.6, steel);
-    s.needle(.{ 0, 0 }, 200, 14.2, 3.4, "#e23a1e");
-    s.caption("#101010", "#6a6d73", "CONCEPT 02", "SHATTER", "Dial broken open around the emblem, mechanism showing through.", "Twelve-facet bezel. Miyota 8N24 skeleton. Steel or titanium.");
+    crown(s, gun, 90, 21.4, 3.6, 4.8);
+    s.w("<rect x='-21.5' y='-21.5' width='43' height='43' rx='12.5' fill='url(#gun)' filter='url(#sh)'/>\n", .{});
+    s.w("<rect x='-20.3' y='-20.3' width='40.6' height='40.6' rx='11.6' fill='url(#gun_r)'/>\n", .{});
+    s.w("<rect x='-19.0' y='-19.0' width='38' height='38' rx='10.6' fill='url(#gun)'/>\n", .{});
+    s.circle(.{ 0, 0 }, 16.9, "fill='url(#steel)'");
+    s.circle(.{ 0, 0 }, 16.3, "fill='#0b0c0f'");
+    shatterDial(s, 15.6);
+    s.caption("#f4f4f0", "#8e939c", "CASE B", "CUSHION", "Rounded-square case with a round dial, short lugs, stepped bezel.", "Chunky and soft-edged. Dark gunmetal, rubber or leather strap.");
     s.end();
 }
 
-fn subdial(s: *Svg, c: P, r: f32, labels: []const []const u8, hand_deg: f32) void {
-    s.w("<g transform='translate({d:.3} {d:.3})'>\n", .{ c[0], c[1] });
-    s.circle(.{ 0, 0 }, r, "fill='#e4dcc6' stroke='#3c2a18' stroke-width='0.1'");
-    var i: u32 = 1;
-    while (i < 6) : (i += 1) s.circle(.{ 0, 0 }, r * @as(f32, @floatFromInt(i)) / 6.5, "fill='none' stroke='#3c2a18' stroke-opacity='0.13' stroke-width='0.05'");
-    s.ticks(60, r * 0.96, r * 0.86, 0, "stroke='#1a1410' stroke-width='0.06'");
-    s.ticks(12, r * 0.96, r * 0.76, 0, "stroke='#1a1410' stroke-width='0.14'");
-    for (labels, 0..) |label, k| {
-        const p = polar(360.0 * @as(f32, @floatFromInt(k)) / @as(f32, @floatFromInt(labels.len)), r * 0.55);
-        s.w("<text x='{d:.3}' y='{d:.3}' font-family='DejaVu Serif, serif' font-size='{d:.2}' text-anchor='middle' dominant-baseline='central' fill='#1a1410'>{s}</text>\n", .{ p[0], p[1], r * 0.27, label });
+/// C: octagonal sports case with an integrated bracelet.
+fn caseOctagon(s: *Svg) void {
+    s.begin("#dfe1e4", &.{ steel, gun, brass, bronze });
+    bracelet(s, steel, 27.0, 19.0, 22.5);
+    crown(s, steel, 90, 20.6, 3.4, 4.4);
+    s.w("<path d='M-19.6 -15 Q-21.6 0 -19.6 15 L-13.6 25.4 L13.6 25.4 L19.6 15 Q21.6 0 19.6 -15 L13.6 -25.4 L-13.6 -25.4 Z' fill='url(#steel_h)' filter='url(#sh)'/>\n", .{});
+    var oct: [8]P = undefined;
+    var inner: [8]P = undefined;
+    for (&oct, &inner, 0..) |*o, *n, i| {
+        o.* = polar(22.5 + 45.0 * @as(f32, @floatFromInt(i)), 21.2);
+        n.* = polar(22.5 + 45.0 * @as(f32, @floatFromInt(i)), 19.9);
     }
-    s.hand(.{ 0, 0 }, hand_deg, r * 0.82, r * 0.25, r * 0.16, blued);
-    s.circle(.{ 0, 0 }, r * 0.07, "fill='#0a1340'");
-    s.w("</g>\n", .{});
-}
-
-/// 03 FATHOM: a ship's chronometer with two sub-dials.
-fn fathom(s: *Svg) void {
-    s.begin("#10202b", &.{ steel, bronze, blued });
-    s.strap("#4d2e12", "#8a5a2b", true);
-    s.lugs(bronze);
-    // Onion crown and two mushroom pushers.
-    s.w("<g filter='url(#sh)'><rect x='20' y='-1.1' width='2.2' height='2.2' fill='url(#bronze_h)'/><ellipse cx='24.4' cy='0' rx='2.6' ry='3.1' fill='url(#bronze)'/>", .{});
-    for ([_]f32{ -1.8, -0.6, 0.6, 1.8 }) |y| s.w("<path d='M22.2 {d:.2} Q24.6 {d:.2} 26.8 {d:.2}' stroke='#46260f' stroke-width='0.14' fill='none'/>", .{ y, y * 1.5, y });
-    s.w("</g>\n", .{});
-    for ([_]f32{ 57, 123 }) |a| {
-        s.w("<g transform='rotate({d:.1})' filter='url(#sh)'><rect x='-0.9' y='-23.4' width='1.8' height='3' fill='url(#bronze_h)'/><rect x='-1.7' y='-24.9' width='3.4' height='1.9' rx='0.6' fill='url(#bronze)'/></g>\n", .{a});
-    }
-    s.circle(.{ 0, 0 }, 21.0, "fill='url(#bronze)' filter='url(#sh)'");
-    s.ticks(150, 20.8, 19.0, 0, "stroke='#46260f' stroke-width='0.2'");
-    s.circle(.{ 0, 0 }, 18.9, "fill='url(#bronze_r)'");
-    s.circle(.{ 0, 0 }, 17.5, "fill='url(#bronze)'");
-    s.w("<defs><radialGradient id='enamel'><stop offset='0' stop-color='#fdfaf0'/><stop offset='0.8' stop-color='#f1ead7'/><stop offset='1' stop-color='#ddd3b9'/></radialGradient></defs>\n", .{});
-    s.circle(.{ 0, 0 }, 17.0, "fill='url(#enamel)'");
-    // Railroad minute track.
-    s.circle(.{ 0, 0 }, 16.5, "fill='none' stroke='#1a1410' stroke-width='0.08'");
-    s.circle(.{ 0, 0 }, 15.6, "fill='none' stroke='#1a1410' stroke-width='0.08'");
-    s.ticks(60, 16.5, 15.6, 0, "stroke='#1a1410' stroke-width='0.08'");
-    s.ticks(12, 16.5, 15.6, 0, "stroke='#1a1410' stroke-width='0.4'");
-    const roman = [_][]const u8{ "XII", "I", "II", "", "IIII", "V", "", "VII", "VIII", "", "X", "XI" };
-    for (roman, 0..) |n, k| {
-        if (n.len == 0) continue;
-        s.ringText(30.0 * @as(f32, @floatFromInt(k)), 12.9, 3.1, n, "font-family='DejaVu Serif, serif' fill='#1a1410'");
-    }
-    subdial(s, .{ -7.6, 0 }, 4.5, &.{ "60", "20", "40" }, 140);
-    subdial(s, .{ 7.6, 0 }, 4.5, &.{ "30", "10", "20" }, 0);
-    // Power-reserve style arc at 6 carrying the name.
-    s.emblem(.{ -3.9, -6.3 }, 0.022, 0, 0, "fill='#1a1410'");
-    s.text(.{ 0, 7.4 }, 1.3, "semicentric", "font-family='Inter Display, Inter, sans-serif' font-weight='600' text-anchor='middle' fill='#1a1410'");
-    s.text(.{ 0, 9.5 }, 0.85, "CHRONOGRAPH", "font-family='DejaVu Serif, serif' letter-spacing='0.3' text-anchor='middle' fill='#7a1a12'");
-    s.hand(.{ 0, 0 }, 304, 8.8, 2.0, 2.3, blued);
-    s.hand(.{ 0, 0 }, 50, 14.6, 2.4, 1.7, blued);
-    s.needle(.{ 0, 0 }, 0, 15.8, 4.2, "#7a1a12");
-    s.caption("#f1ead7", "#8fa4b3", "CONCEPT 03", "FATHOM", "Ship's-chronometer face, two sub-dials, stopwatch pushers.", "Sea-Gull ST1901 chronograph, visible through the back. Bronze.");
-    s.end();
-}
-
-/// 04 FOCAL: the burst radiates from a spinning tourbillon.
-fn focalPoint(s: *Svg) void {
-    s.begin("#d9d6cf", &.{ steel, titan, brass });
-    s.strap("#0a0a0b", "#232326", false);
-    s.lugs(titan);
-    s.w("<rect x='20' y='-2.2' width='4.4' height='4.4' rx='1.2' fill='url(#titan_h)' filter='url(#sh)'/>\n", .{});
-    s.circle(.{ 0, 0 }, 21.0, "fill='url(#titan)' filter='url(#sh)'");
-    s.circle(.{ 0, 0 }, 19.2, "fill='url(#titan_r)'");
-    s.circle(.{ 0, 0 }, 18.6, "fill='#0b0b0d'");
-    // Rays engraved from the tourbillon, not from the dial centre.
-    const eye = P{ 0, 7.4 };
-    s.w("<defs><clipPath id='rayclip'><circle r='18.6'/></clipPath></defs><g clip-path='url(#rayclip)'>\n", .{});
+    s.poly(&oct, "fill='url(#steel)' filter='url(#sh)'");
+    s.poly(&inner, "fill='url(#steel_r)'");
     var i: u32 = 0;
-    while (i < 120) : (i += 1) {
-        const p = polar(3.0 * @as(f32, @floatFromInt(i)), 40.0);
-        s.line(eye, .{ eye[0] + p[0], eye[1] + p[1] }, if (i % 2 == 0) "stroke='#ffffff' stroke-opacity='0.13' stroke-width='0.2'" else "stroke='#000000' stroke-opacity='0.5' stroke-width='0.16'");
+    while (i < 8) : (i += 1) s.screw(polar(45.0 * @as(f32, @floatFromInt(i)), 17.45), 0.78, 30.0 + 45.0 * @as(f32, @floatFromInt(i)));
+    s.circle(.{ 0, 0 }, 16.2, "fill='#0b0c0f'");
+    shatterDial(s, 15.5);
+    s.caption("#101010", "#6a6d73", "CASE C", "OCTAGON", "Eight-sided bezel with exposed screws; the case flows into the bracelet.", "Angular, so it echoes the shards. Brushed steel or titanium.");
+    s.end();
+}
+
+/// D: an irregular faceted case, cut like the emblem itself.
+fn caseShard(s: *Svg) void {
+    s.begin("#141517", &.{ steel, titan, brass, bronze });
+    s.strap("#060607", "#202124", false);
+    const outline = [_]P{ .{ -15.5, -21.5 }, .{ 7.5, -24.0 }, .{ 20.8, -13.0 }, .{ 24.2, 3.4 }, .{ 13.6, 21.6 }, .{ -8.6, 24.2 }, .{ -21.4, 11.2 }, .{ -22.6, -8.4 } };
+    crown(s, titan, 101, 22.6, 3.6, 4.4);
+    s.poly(&outline, "fill='#55524d' filter='url(#sh)'");
+    // Each facet runs from an outside edge in to the round dial opening.
+    for (outline, 0..) |a, n| {
+        const b = outline[(n + 1) % outline.len];
+        const mx = (a[0] + b[0]) / 2.0;
+        const my = (a[1] + b[1]) / 2.0;
+        const facing = std.math.atan2(my, mx);
+        const lit = 0.5 + 0.45 * @cos(facing - (-2.2)); // light from upper left
+        const g: u32 = @intFromFloat(60.0 + 175.0 * lit);
+        const la = @sqrt(a[0] * a[0] + a[1] * a[1]);
+        const lb = @sqrt(b[0] * b[0] + b[1] * b[1]);
+        const ia = P{ a[0] / la * 16.4, a[1] / la * 16.4 };
+        const ib = P{ b[0] / lb * 16.4, b[1] / lb * 16.4 };
+        s.w("<polygon points='{d:.3},{d:.3} {d:.3},{d:.3} {d:.3},{d:.3} {d:.3},{d:.3}' fill='rgb({d},{d},{d})' stroke='#101010' stroke-opacity='0.35' stroke-width='0.08'/>\n", .{ a[0], a[1], b[0], b[1], ib[0], ib[1], ia[0], ia[1], g, g - 4, g - 10 });
     }
-    s.w("</g>\n", .{});
-    s.ticks(60, 18.2, 17.6, 0, "stroke='#d9d6cf' stroke-width='0.09'");
-    s.ticks(12, 18.2, 16.6, 0, "stroke='#ffffff' stroke-width='0.5'");
-    // Tourbillon: the whole escapement turns once a minute in this window.
-    s.circle(eye, 6.1, "fill='url(#titan)' filter='url(#sh2)'");
-    s.circle(eye, 5.6, "fill='#060608'");
-    s.balance(eye, 4.0, brass);
-    s.w("<g transform='translate({d:.3} {d:.3}) rotate(25)'>", .{ eye[0], eye[1] });
-    s.circle(.{ 0, 0 }, 5.0, "fill='none' stroke='url(#steel)' stroke-width='0.45'");
-    for ([_]f32{ 0, 120, 240 }) |a| {
-        const p = polar(a, 5.0);
-        s.w("<line x1='0' y1='0' x2='{d:.3}' y2='{d:.3}' stroke='url(#steel)' stroke-width='0.5'/>", .{ p[0], p[1] });
-    }
-    s.w("<polygon points='0,-5.6 0.6,-4.6 -0.6,-4.6' fill='#e23a1e'/></g>\n", .{});
-    s.w("<rect x='-6.4' y='{d:.3}' width='12.8' height='1.5' rx='0.75' fill='url(#steel)' filter='url(#sh2)'/>\n", .{eye[1] - 0.75});
-    s.screw(.{ -5.6, eye[1] }, 0.5, 40);
-    s.screw(.{ 5.6, eye[1] }, 0.5, 120);
-    s.circle(eye, 0.55, "fill='#b3123a' stroke='#ffe9a6' stroke-width='0.15'");
-    // The emblem, burst outward around the tourbillon with its blade to 12.
-    s.emblem(eye, 0.047, -90, 6.6, "fill='url(#steel)' stroke='#ffffff' stroke-width='0.07' filter='url(#sh)'");
-    s.text(.{ -14.2, -4.6 }, 1.25, "semicentric", "font-family='Inter Display, Inter, sans-serif' font-weight='600' fill='#d9d6cf'");
-    s.text(.{ -14.2, -2.9 }, 0.8, "TOURBILLON", "font-family='Inter, sans-serif' letter-spacing='0.3' fill='#86837d'");
-    s.hand(.{ 0, 0 }, 300, 8.2, 1.8, 2.0, steel);
-    s.hand(.{ 0, 0 }, 52, 13.4, 2.2, 1.5, steel);
-    s.circle(.{ 0, 0 }, 0.9, "fill='url(#steel)' stroke='#22252a' stroke-width='0.1'");
-    s.caption("#101010", "#6a6d73", "CONCEPT 04", "FOCAL", "The emblem bursts out of a tourbillon that turns once a minute.", "Off-centre engraved rays. Sea-Gull ST8000 tourbillon. Titanium.");
+    s.circle(.{ 0, 0 }, 16.9, "fill='url(#titan)'");
+    s.circle(.{ 0, 0 }, 16.2, "fill='#0b0c0f'");
+    shatterDial(s, 15.5);
+    s.caption("#f4f4f0", "#8e939c", "CASE D", "SHARD", "Irregular faceted case cut like the emblem; no two sides match.", "The most unusual of the four. Suits 3D printing well. Titanium.");
     s.end();
 }
 
@@ -448,12 +402,12 @@ pub fn main(init: std.process.Init) !void {
     const cwd = std.Io.Dir.cwd();
     try cwd.createDirPath(io, "concepts");
 
-    const Concept = struct { file: []const u8, draw: *const fn (*Svg) void };
-    const all = [_]Concept{
-        .{ .file = "concepts/01-vault.svg", .draw = vault },
-        .{ .file = "concepts/02-shatter.svg", .draw = shatter },
-        .{ .file = "concepts/03-fathom.svg", .draw = fathom },
-        .{ .file = "concepts/04-focal.svg", .draw = focalPoint },
+    const Sheet = struct { file: []const u8, draw: *const fn (*Svg) void };
+    const all = [_]Sheet{
+        .{ .file = "concepts/case-a-diver.svg", .draw = caseDiver },
+        .{ .file = "concepts/case-b-cushion.svg", .draw = caseCushion },
+        .{ .file = "concepts/case-c-octagon.svg", .draw = caseOctagon },
+        .{ .file = "concepts/case-d-shard.svg", .draw = caseShard },
     };
     for (all) |c| {
         var svg = Svg{ .gpa = gpa };
