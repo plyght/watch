@@ -1,6 +1,6 @@
-"""Renders out/watch.obj in each case finish with Blender Cycles.
+"""Renders out/watch.obj with Blender Cycles.
 
-Run:  blender -b -P render/render.py -- [--samples N] [--size PX] [variant ...]
+Run:  blender -b -P render/render.py -- [--samples N] [--size PX] [view ...]
 
 Blender's scripting interface is Python-only, so this scene setup is the one
 non-Zig file in the project. All geometry comes from the Zig generator.
@@ -11,18 +11,15 @@ import os
 import sys
 
 import bpy
-import numpy as np
+from mathutils import Vector
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# name: (label, base colour, roughness, bezel roughness, strap colour)
-VARIANTS = {
-    "titanium": ("01  blasted titanium", (0.36, 0.34, 0.32), 0.48, 0.40, (0.012, 0.012, 0.012)),
-    "steel": ("02  brushed + polished steel", (0.72, 0.72, 0.73), 0.24, 0.07, (0.012, 0.012, 0.012)),
-    "gunmetal": ("03  black DLC gunmetal", (0.075, 0.075, 0.085), 0.30, 0.16, (0.012, 0.012, 0.012)),
-    "bronze": ("04  bronze", (0.70, 0.40, 0.19), 0.30, 0.14, (0.05, 0.022, 0.01)),
-    "anodized": ("05  anodized titanium, deep blue", (0.03, 0.08, 0.42), 0.32, 0.20, (0.012, 0.012, 0.012)),
-    "silver": ("06  cast silver", (0.93, 0.92, 0.89), 0.20, 0.06, (0.012, 0.012, 0.012)),
+# view name: (camera position, look-at point, lens in mm)
+VIEWS = {
+    "hero": ((38, -112, 118), (0, 1, 4), 85),
+    "face": ((0, -4, 230), (0, 0, 5), 110),
+    "side": ((120, -95, 42), (0, 0, 4), 85),
 }
 
 
@@ -37,7 +34,7 @@ def args():
             size = int(argv[i + 1]); i += 2
         else:
             names.append(argv[i]); i += 1
-    return samples, size, names or list(VARIANTS)
+    return samples, size, names or list(VIEWS)
 
 
 def principled(name, color, metallic=0.0, roughness=0.5):
@@ -50,29 +47,23 @@ def principled(name, color, metallic=0.0, roughness=0.5):
     return mat
 
 
-def dial_material():
-    """Matte black with a fine grid of cells, like a memory array."""
-    mat = principled("dial", (0.006, 0.006, 0.007), 0.0, 0.55)
+def brushed(name, color, roughness, direction):
+    """Metal with a fine directional grain, like a brushed finish."""
+    mat = principled(name, color, 1.0, roughness)
     nt = mat.node_tree
     bsdf = nt.nodes["Principled BSDF"]
     coord = nt.nodes.new("ShaderNodeTexCoord")
-    brick = nt.nodes.new("ShaderNodeTexBrick")
-    brick.offset = 0.0
-    brick.inputs["Scale"].default_value = 0.55
-    brick.inputs["Mortar Size"].default_value = 0.03
-    brick.inputs["Brick Width"].default_value = 0.5
-    brick.inputs["Row Height"].default_value = 0.5
-    ramp = nt.nodes.new("ShaderNodeMapRange")
-    ramp.inputs["To Min"].default_value = 0.7
-    ramp.inputs["To Max"].default_value = 0.2
+    mapping = nt.nodes.new("ShaderNodeMapping")
+    mapping.inputs["Scale"].default_value = direction
+    noise = nt.nodes.new("ShaderNodeTexNoise")
+    noise.inputs["Scale"].default_value = 1.0
+    noise.inputs["Detail"].default_value = 3.0
     bump = nt.nodes.new("ShaderNodeBump")
-    bump.inputs["Strength"].default_value = 0.6
-    bump.inputs["Distance"].default_value = 0.05
-    bump.invert = True
-    nt.links.new(coord.outputs["Object"], brick.inputs["Vector"])
-    nt.links.new(brick.outputs["Fac"], ramp.inputs["Value"])
-    nt.links.new(ramp.outputs["Result"], bsdf.inputs["Roughness"])
-    nt.links.new(brick.outputs["Fac"], bump.inputs["Height"])
+    bump.inputs["Strength"].default_value = 0.12
+    bump.inputs["Distance"].default_value = 0.02
+    nt.links.new(coord.outputs["Object"], mapping.inputs["Vector"])
+    nt.links.new(mapping.outputs["Vector"], noise.inputs["Vector"])
+    nt.links.new(noise.outputs["Fac"], bump.inputs["Height"])
     nt.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
     return mat
 
@@ -84,7 +75,7 @@ def glass_material():
     bsdf = nt.nodes["Principled BSDF"]
     bsdf.inputs["Transmission Weight"].default_value = 1.0
     bsdf.inputs["Roughness"].default_value = 0.0
-    bsdf.inputs["IOR"].default_value = 1.22  # low value stands in for an anti-reflective coating
+    bsdf.inputs["IOR"].default_value = 1.25  # low value stands in for an anti-reflective coating
     # Let light reach the dial directly instead of relying on caustics.
     out = nt.nodes["Material Output"]
     path = nt.nodes.new("ShaderNodeLightPath")
@@ -97,14 +88,7 @@ def glass_material():
     return mat
 
 
-def set_color(mat, color, roughness):
-    bsdf = mat.node_tree.nodes["Principled BSDF"]
-    bsdf.inputs["Base Color"].default_value = (*color, 1)
-    bsdf.inputs["Roughness"].default_value = roughness
-
-
 def look_at(obj, target):
-    from mathutils import Vector
     direction = Vector(target) - obj.location
     obj.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
 
@@ -127,14 +111,17 @@ def softbox(name, location, target, size, strength):
     return obj
 
 
-def text(body, size, location, mat, align="CENTER"):
+def text(body, size, location, mat, rotation=0.0, weight=0.0):
     curve = bpy.data.curves.new(body, "FONT")
     curve.body = body
     curve.size = size
-    curve.align_x = align
-    curve.extrude = 0.01
+    curve.align_x = "CENTER"
+    curve.align_y = "CENTER"
+    curve.extrude = 0.008
+    curve.offset = weight
     obj = bpy.data.objects.new(body, curve)
     obj.location = location
+    obj.rotation_euler = (0, 0, rotation)
     obj.data.materials.append(mat)
     bpy.context.collection.objects.link(obj)
     return obj
@@ -143,54 +130,101 @@ def text(body, size, location, mat, align="CENTER"):
 def build_scene(samples, size):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
-    scene.unit_settings.scale_length = 0.001
-
     bpy.ops.wm.obj_import(filepath=os.path.join(ROOT, "out", "watch.obj"), forward_axis="Y", up_axis="Z")
 
+    steel = (0.74, 0.74, 0.75)
     mats = {
-        "case": principled("case", (0.5, 0.5, 0.5), 1.0, 0.3),
-        "bezel": principled("bezel", (0.5, 0.5, 0.5), 1.0, 0.1),
-        "bright": principled("bright", (0.90, 0.90, 0.90), 1.0, 0.22),
-        "dial": dial_material(),
-        "rehaut": principled("rehaut", (0.012, 0.012, 0.013), 0.0, 0.35),
+        "brushed": brushed("brushed", steel, 0.30, (0.4, 60, 60)),
+        "polished": principled("polished", (0.80, 0.80, 0.81), 1.0, 0.06),
+        "satin": principled("satin", steel, 1.0, 0.26),
+        "insert": principled("insert", (0.006, 0.006, 0.007), 0.0, 0.07),
+        "dial": principled("dial", (0.004, 0.004, 0.005), 0.0, 0.75),
+        "rehaut": principled("rehaut", (0.01, 0.01, 0.011), 0.0, 0.3),
+        "lume": principled("lume", (0.82, 0.86, 0.78), 0.0, 0.7),
+        "print": principled("print", (0.85, 0.85, 0.83), 0.0, 0.5),
         "glass": glass_material(),
-        "strap": principled("strap", (0.012, 0.012, 0.012), 0.0, 0.62),
-        "accent": principled("accent", (0.80, 0.07, 0.015), 0.0, 0.4),
-        "print": principled("print", (0.80, 0.80, 0.78), 0.0, 0.5),
-        "floor": principled("floor", (0.60, 0.60, 0.58), 0.0, 0.55),
-        "label": principled("label", (0.03, 0.03, 0.03), 0.0, 0.6),
+        "brass": principled("brass", (0.83, 0.61, 0.27), 1.0, 0.25),
+        "plate": brushed("plate", (0.78, 0.60, 0.30), 0.35, (40, 40, 40)),
+        "ruby": principled("ruby", (0.55, 0.01, 0.05), 0.0, 0.1),
+        "floor": principled("floor", (0.55, 0.55, 0.53), 0.0, 0.5),
     }
     assign = {
-        "case_mid": "case", "case_back": "case", "lugs": "case", "crown": "case",
-        "bezel": "bezel", "rehaut": "rehaut", "crystal": "glass", "dial": "dial",
-        "emblem": "bright", "markers": "bright", "hand_hour": "bright",
-        "hand_minute": "bright", "hand_cap": "bright", "hand_second": "accent",
-        "strap": "strap",
+        "case_mid": "brushed", "case_back": "satin", "crown_guard": "brushed", "crown": "polished",
+        "bezel": "polished", "insert": "insert", "insert_pip": "lume", "rehaut": "rehaut",
+        "crystal": "glass", "dial": "dial", "cut_emblem": "polished", "print": "print",
+        "marker_steel": "polished", "marker_lume": "lume", "hand_steel": "polished", "hand_lume": "lume",
+        "mov_plate": "plate", "mov_brass": "brass", "mov_steel": "satin", "mov_ruby": "ruby",
+        "bracelet": "brushed", "bracelet_mid": "satin",
     }
-    for obj in list(scene.objects):
-        if obj.type != "MESH":
-            continue
+
+    # Objects that share a name arrive as name, name.001, ...; join them.
+    groups = {}
+    for obj in scene.objects:
+        if obj.type == "MESH":
+            groups.setdefault(obj.name.split(".")[0], []).append(obj)
+    parts = {}
+    for name, objs in groups.items():
+        bpy.ops.object.select_all(action="DESELECT")
+        for obj in objs:
+            obj.select_set(True)
+        bpy.context.view_layer.objects.active = objs[0]
+        if len(objs) > 1:
+            bpy.ops.object.join()
+        part = bpy.context.view_layer.objects.active
+        part.name = name
+        parts[name] = part
+
+    for name, obj in parts.items():
         mesh = obj.data
         mesh.materials.clear()
-        mesh.materials.append(mats[assign[obj.name]])
+        mesh.materials.append(mats[assign[name]])
+        bpy.ops.object.select_all(action="DESELECT")
         bpy.context.view_layer.objects.active = obj
         obj.select_set(True)
         bpy.ops.object.mode_set(mode="EDIT")
         bpy.ops.mesh.select_all(action="SELECT")
         bpy.ops.mesh.normals_make_consistent(inside=False)
         bpy.ops.object.mode_set(mode="OBJECT")
-        obj.select_set(False)
-        for poly in mesh.polygons:
+
+    # Cut the emblem out of the dial. The cut walls take the cutter's
+    # polished material, so the windows get a bright machined edge.
+    dial, cutter = parts["dial"], parts["cut_emblem"]
+    dial.data.materials.append(mats["polished"])
+    mod = dial.modifiers.new("emblem", "BOOLEAN")
+    mod.operation = "DIFFERENCE"
+    mod.object = cutter
+    mod.solver = "EXACT"
+    mod.material_mode = "TRANSFER"
+    bpy.ops.object.select_all(action="DESELECT")
+    bpy.context.view_layer.objects.active = dial
+    dial.select_set(True)
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    bpy.data.objects.remove(cutter)
+    del parts["cut_emblem"]
+
+    for obj in parts.values():
+        for poly in obj.data.polygons:
             poly.use_smooth = True
-        mesh.set_sharp_from_angle(angle=math.radians(24))
+        obj.data.set_sharp_from_angle(angle=math.radians(28))
 
-    # Wordmark on the dial, below the long blade of the emblem.
-    text("semicentric", 1.15, (5.6, -7.2, 7.005), mats["print"])
+    # Printed text: the wordmark on the dial and the minute scale on the bezel.
+    text("semicentric", 1.2, (5.4, -8.6, 7.41), mats["print"])
+    for minutes in (10, 20, 30, 40, 50):
+        a = math.radians(minutes * 6)
+        text(str(minutes), 2.1, (17.6 * math.sin(a), 17.6 * math.cos(a), 9.93), mats["print"], rotation=-a, weight=0.02)
+    for minute in range(60):
+        if minute % 10 == 0:
+            continue
+        a = math.radians(minute * 6)
+        long = minute % 5 == 0
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(17.6 * math.sin(a), 17.6 * math.cos(a), 9.92))
+        tick = bpy.context.object
+        tick.scale = (0.28 if long else 0.12, 1.9 if long else 0.9, 0.02)
+        tick.rotation_euler = (0, 0, -a)
+        tick.data.materials.append(mats["print"])
 
-    bpy.ops.mesh.primitive_plane_add(size=4000, location=(0, 0, -1.25))
+    bpy.ops.mesh.primitive_plane_add(size=4000, location=(0, 0, -0.3))
     bpy.context.object.data.materials.append(mats["floor"])
-
-    label = text("", 2.1, (-37, 33, -1.24), mats["label"], align="LEFT")
 
     world = bpy.data.worlds.new("world")
     world.use_nodes = True
@@ -207,19 +241,15 @@ def build_scene(samples, size):
     nt.links.new(env.outputs["Color"], nt.nodes["Background"].inputs["Color"])
     nt.nodes["Background"].inputs["Strength"].default_value = 0.45
 
-    target = (0, -1.0, 5.0)
-    softbox("overhead", (0, 170, 250), target, (360, 240), 1.6)
+    target = (0, 0, 5)
+    softbox("overhead", (0, 170, 250), target, (360, 240), 1.1)
     softbox("left", (-260, -30, 110), target, (160, 260), 3.0)
     softbox("right", (240, 60, 60), target, (60, 300), 4.5)
     softbox("front", (0, -260, 60), target, (320, 90), 2.2)
 
-    cam_data = bpy.data.cameras.new("camera")
-    cam_data.lens = 90
-    cam_data.clip_start, cam_data.clip_end = 1, 5000
-    cam = bpy.data.objects.new("camera", cam_data)
-    cam.location = (0, -105, 165)
+    cam = bpy.data.objects.new("camera", bpy.data.cameras.new("camera"))
+    cam.data.clip_start, cam.data.clip_end = 1, 5000
     bpy.context.collection.objects.link(cam)
-    look_at(cam, target)
     scene.camera = cam
 
     scene.render.engine = "CYCLES"
@@ -231,46 +261,21 @@ def build_scene(samples, size):
     scene.render.image_settings.file_format = "PNG"
     scene.view_settings.view_transform = "AgX"
     scene.view_settings.look = "AgX - Medium High Contrast"
-    return scene, mats, label
-
-
-def contact_sheet(paths, out_path, cols=3):
-    tiles = []
-    for p in paths:
-        img = bpy.data.images.load(p)
-        w, h = img.size
-        tiles.append(np.array(img.pixels[:], dtype=np.float32).reshape(h, w, 4))
-    h, w = tiles[0].shape[:2]
-    rows = math.ceil(len(tiles) / cols)
-    sheet = np.ones((rows * h, cols * w, 4), dtype=np.float32)
-    for i, tile in enumerate(tiles):
-        r, c = divmod(i, cols)
-        y0 = (rows - 1 - r) * h  # image rows run bottom-up
-        sheet[y0 : y0 + h, c * w : (c + 1) * w] = tile
-    out = bpy.data.images.new("sheet", cols * w, rows * h)
-    out.pixels = sheet.ravel()
-    out.filepath_raw = out_path
-    out.file_format = "PNG"
-    out.save()
+    return scene, cam
 
 
 def main():
     samples, size, names = args()
-    scene, mats, label = build_scene(samples, size)
+    scene, cam = build_scene(samples, size)
     out_dir = os.path.join(ROOT, "renders")
     os.makedirs(out_dir, exist_ok=True)
-    paths = []
     for name in names:
-        title, color, rough, bezel_rough, strap = VARIANTS[name]
-        set_color(mats["case"], color, rough)
-        set_color(mats["bezel"], color, bezel_rough)
-        set_color(mats["strap"], strap, 0.62)
-        label.data.body = title.replace("  ", "\n", 1)
-        scene.render.filepath = os.path.join(out_dir, f"sc01-{name}.png")
+        position, target, lens = VIEWS[name]
+        cam.location = position
+        cam.data.lens = lens
+        look_at(cam, target)
+        scene.render.filepath = os.path.join(out_dir, f"diver-{name}.png")
         bpy.ops.render.render(write_still=True)
-        paths.append(scene.render.filepath)
-    if len(paths) > 1:
-        contact_sheet(paths, os.path.join(out_dir, "sc01-all-finishes.png"))
 
 
 main()

@@ -1,12 +1,13 @@
-//! SC-01 concept watch: parametric geometry generator.
+//! Diver watch with the semicentric emblem cut through the dial.
+//! Parametric geometry generator: writes out/watch.obj.
 //!
 //! Units are millimetres. Z is up (the dial faces +Z), 12 o'clock is +Y and
-//! the crown sits at +X. Output is a single OBJ with one named object per
-//! part, so the renderer can assign a material by object name.
+//! the crown sits at +X. Each part is a named OBJ object so the renderer can
+//! assign materials by name. Objects named `cut_*` are cutters: the renderer
+//! subtracts them from the dial.
 //!
-//! This is concept geometry for renders: parts overlap instead of being
-//! boolean-unioned, and functional seats (crystal, gasket, movement) are not
-//! modelled yet.
+//! This is render geometry: parts overlap instead of being unioned, and the
+//! functional seats (gaskets, movement holder, threads) are not modelled.
 
 const std = @import("std");
 
@@ -16,21 +17,20 @@ const tau: f32 = 2.0 * std.math.pi;
 
 // ---------------------------------------------------------------- dimensions
 
-const case_r: f32 = 20.5; // 41 mm case
-const dial_z: f32 = 7.0; // top surface of the dial
-const dial_r: f32 = 14.3;
-const crystal_r: f32 = 15.0;
-const lug_gap: f32 = 20.0; // strap width
-const floor_z: f32 = -1.25;
+const case_r: f32 = 20.0; // 40 mm case
+const case_top: f32 = 7.0; // top of the mid-case, where the bezel sits
+const lug_gap: f32 = 20.0;
+const lug_tip_y: f32 = 24.5; // 49 mm lug to lug
+const floor_z: f32 = -0.3;
 
-// Emblem placement: the burst's focal point sits off-centre ("semicentric"),
-// so the hands emerge from the gap between the two largest shards.
-const emblem_focal_svg = V2{ 114.0, 266.0 };
-const emblem_focal_mm = V2{ -7.4, -1.8 };
-const emblem_scale: f32 = 0.058; // mm per SVG unit
-const emblem_height: f32 = 0.6;
+const dial_r: f32 = 14.6;
+const dial_z: f32 = 7.4; // top surface of the dial
+const dial_thickness: f32 = 0.6;
+const crystal_r: f32 = 15.5;
 
-// The five shards of the semicentric emblem, in SVG coordinates (y down).
+// The emblem, in its native SVG coordinates (y down), centred on the dial.
+const emblem_centre = V2{ 256.0, 256.0 };
+const emblem_scale: f32 = dial_r * 1.8 / 430.0;
 const shard_a = [_]V2{ .{ 115, 251.5 }, .{ 126, 248.5 }, .{ 250, 174.5 }, .{ 137, 194 }, .{ 116, 238 } };
 const shard_b = [_]V2{ .{ 57, 262.5 }, .{ 87.5, 266 }, .{ 98.5, 263.5 }, .{ 64.5, 244 } };
 const shard_c = [_]V2{ .{ 125.5, 265.5 }, .{ 160, 278 }, .{ 471, 256 }, .{ 147, 255.5 } };
@@ -93,8 +93,7 @@ const Flute = struct {
     weight: []const f32,
 };
 
-/// Revolves a closed (r, h) profile around an axis. `origin` is the point the
-/// axis passes through; h runs along the axis.
+/// Revolves a closed (r, h) profile around an axis through `origin`.
 fn lathe(m: *Mesh, profile: []const V2, segs: u32, axis: Axis, origin: V3, flute: ?Flute) void {
     const n: u32 = @intCast(profile.len);
     const base = m.nv + 1;
@@ -107,7 +106,7 @@ fn lathe(m: *Mesh, profile: []const V2, segs: u32, axis: Axis, origin: V3, flute
             var r = p[0];
             if (flute) |f| {
                 const ph = t * f.teeth;
-                const saw = @abs(2.0 * (ph - @floor(ph)) - 1.0); // 1 at tooth tip, 0 in the valley
+                const saw = @abs(2.0 * (ph - @floor(ph)) - 1.0);
                 r -= f.depth * f.weight[j] * (1.0 - saw);
             }
             _ = m.v(switch (axis) {
@@ -156,9 +155,9 @@ fn loft(m: *Mesh, a: []const V3, b: []const V3) void {
     m.ngon(fb, n, false);
 }
 
-/// A faceted "tent": a flat polygon at z0 rising to a smaller copy of itself,
-/// pulled toward the centroid, at z0 + height.
-fn tent(m: *Mesh, poly: []const V2, z0: f32, height: f32, keep: f32) void {
+/// A flat polygon at z0 rising by `height` to a copy of itself scaled toward
+/// its centroid by `keep` (1.0 gives straight walls).
+fn prism(m: *Mesh, poly: []const V2, z0: f32, height: f32, keep: f32) void {
     var a: [16]V3 = undefined;
     var b: [16]V3 = undefined;
     var cx: f32 = 0;
@@ -177,6 +176,17 @@ fn tent(m: *Mesh, poly: []const V2, z0: f32, height: f32, keep: f32) void {
     loft(m, a[0..poly.len], b[0..poly.len]);
 }
 
+/// Extrudes a (y, z) profile along X from x0 to x1.
+fn extrudeX(m: *Mesh, profile: []const V2, x0: f32, x1: f32, sy: f32) void {
+    var a: [16]V3 = undefined;
+    var b: [16]V3 = undefined;
+    for (profile, 0..) |p, i| {
+        a[i] = .{ x0, sy * p[0], p[1] };
+        b[i] = .{ x1, sy * p[0], p[1] };
+    }
+    loft(m, a[0..profile.len], b[0..profile.len]);
+}
+
 /// Rotates a point clockwise from 12 o'clock by `deg`, as a clock hand moves.
 fn clock(p: V2, deg: f32) V2 {
     const a = deg * tau / 360.0;
@@ -185,180 +195,353 @@ fn clock(p: V2, deg: f32) V2 {
     return .{ p[0] * c + p[1] * s, -p[0] * s + p[1] * c };
 }
 
-/// A kite-shaped faceted shard pointing outward along `deg`, from radius
-/// `r0` (tail) to `r1` (tip), `w` wide at its shoulder.
-fn kite(m: *Mesh, deg: f32, r0: f32, r1: f32, shoulder: f32, w: f32, z0: f32, height: f32) void {
-    const pts = [_]V2{
-        clock(.{ 0, r0 }, deg),
-        clock(.{ w / 2.0, shoulder }, deg),
-        clock(.{ 0, r1 }, deg),
-        clock(.{ -w / 2.0, shoulder }, deg),
-    };
-    tent(m, &pts, z0, height, 0.35);
+fn clockAll(comptime n: usize, pts: [n]V2, deg: f32) [n]V2 {
+    var out: [n]V2 = undefined;
+    for (pts, 0..) |p, i| out[i] = clock(p, deg);
+    return out;
 }
 
-// ---------------------------------------------------------------- parts
+// ---------------------------------------------------------------- case
+
+/// How far the top of the case has dropped at distance |y| from the centre:
+/// flat over the dial, curving down along the lugs.
+fn lugDrop(y: f32) f32 {
+    const start: f32 = 11.0;
+    const ay = @abs(y);
+    if (ay <= start) return 0;
+    const t = (ay - start) / (lug_tip_y - start);
+    return 4.3 * std.math.pow(f32, t, 1.7);
+}
+
+/// Top-view outline of the case with its four lugs, counter-clockwise.
+fn caseOutline(buf: []V2) usize {
+    // One quadrant, from 12 o'clock round to 3 o'clock.
+    var q: [64]V2 = undefined;
+    var n: usize = 0;
+    const x_in: f32 = lug_gap / 2.0 + 0.1;
+    const a_in = std.math.asin(x_in / case_r);
+    const a_out: f32 = 62.0 * tau / 360.0;
+    var i: usize = 0;
+    while (i < 8) : (i += 1) { // arc between the lugs
+        const a = a_in * @as(f32, @floatFromInt(i)) / 8.0;
+        q[n] = .{ case_r * @sin(a), case_r * @cos(a) };
+        n += 1;
+    }
+    q[n] = .{ x_in, case_r * @cos(a_in) };
+    q[n + 1] = .{ x_in, lug_tip_y - 0.7 };
+    q[n + 2] = .{ x_in + 0.5, lug_tip_y };
+    q[n + 3] = .{ x_in + 2.4, lug_tip_y };
+    n += 4;
+    // Outer edge of the lug sweeping back into the case.
+    const p0 = V2{ x_in + 3.2, lug_tip_y - 0.6 };
+    const p1 = V2{ 15.6, 16.5 };
+    const p2 = V2{ case_r * @sin(a_out), case_r * @cos(a_out) };
+    i = 0;
+    while (i < 12) : (i += 1) {
+        const t = @as(f32, @floatFromInt(i)) / 12.0;
+        const u = 1.0 - t;
+        q[n] = .{ u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0], u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1] };
+        n += 1;
+    }
+    i = 0;
+    while (i < 8) : (i += 1) { // arc down to 3 o'clock
+        const a = a_out + (tau / 4.0 - a_out) * @as(f32, @floatFromInt(i)) / 8.0;
+        q[n] = .{ case_r * @sin(a), case_r * @cos(a) };
+        n += 1;
+    }
+    // Mirror the quadrant round the case. Clockwise order here; reversed below.
+    var total: usize = 0;
+    for (q[0..n]) |p| {
+        buf[total] = p;
+        total += 1;
+    }
+    buf[total] = .{ case_r, 0 };
+    total += 1;
+    i = n;
+    while (i > 1) : (i -= 1) {
+        buf[total] = .{ q[i - 1][0], -q[i - 1][1] };
+        total += 1;
+    }
+    for (q[0..n]) |p| {
+        buf[total] = .{ -p[0], -p[1] };
+        total += 1;
+    }
+    buf[total] = .{ -case_r, 0 };
+    total += 1;
+    i = n;
+    while (i > 1) : (i -= 1) {
+        buf[total] = .{ -q[i - 1][0], q[i - 1][1] };
+        total += 1;
+    }
+    std.mem.reverse(V2, buf[0..total]);
+    return total;
+}
+
+/// Moves every outline point inward along its averaged edge normal.
+fn inset(src: []const V2, dst: []V2, amount: f32) void {
+    const n = src.len;
+    for (src, 0..) |p, i| {
+        const a = src[(i + n - 1) % n];
+        const b = src[(i + 1) % n];
+        var nx = -(b[1] - a[1]);
+        var ny = b[0] - a[0];
+        const len = @sqrt(nx * nx + ny * ny);
+        nx /= len;
+        ny /= len;
+        dst[i] = .{ p[0] + nx * amount, p[1] + ny * amount };
+    }
+}
 
 fn caseBody(m: *Mesh) void {
     m.object("case_mid");
-    lathe(m, &.{
-        .{ 15.4, 0 },   .{ 18.6, 0 },   .{ 19.9, 0.9 }, .{ 20.5, 2.5 },
-        .{ 20.5, 6.5 }, .{ 19.9, 8.2 }, .{ 15.4, 8.2 },
-    }, 256, .z, .{ 0, 0, 0 }, null);
+    var outline: [256]V2 = undefined;
+    const n = caseOutline(&outline);
+    var chamfer: [256]V2 = undefined;
+    inset(outline[0..n], chamfer[0..n], 0.75);
+    const count: u32 = @intCast(n);
+
+    // Five rings: bottom chamfer, wall bottom, wall top, top chamfer, and an
+    // inner ring under the bezel that closes the top.
+    const first = m.nv + 1;
+    for (chamfer[0..n]) |p| _ = m.v(.{ p[0], p[1], 0 });
+    for (outline[0..n]) |p| _ = m.v(.{ p[0], p[1], 0.8 });
+    for (outline[0..n]) |p| _ = m.v(.{ p[0], p[1], case_top - lugDrop(p[1]) - 0.75 });
+    for (chamfer[0..n]) |p| _ = m.v(.{ p[0], p[1], case_top - lugDrop(p[1]) });
+    for (outline[0..n]) |p| {
+        const r = @sqrt(p[0] * p[0] + p[1] * p[1]);
+        const k = @min(1.0, 18.0 / r);
+        _ = m.v(.{ p[0] * k, p[1] * k, case_top });
+    }
+    var ring: u32 = 0;
+    while (ring < 4) : (ring += 1) {
+        var i: u32 = 0;
+        while (i < count) : (i += 1) {
+            const k = (i + 1) % count;
+            m.quad(first + ring * count + i, first + ring * count + k, first + (ring + 1) * count + k, first + (ring + 1) * count + i);
+        }
+    }
+    m.ngon(first, count, true);
 
     m.object("case_back");
-    lathe(m, &.{
-        .{ 0, floor_z }, .{ 16.8, floor_z }, .{ 18.0, -0.5 }, .{ 18.0, 0.1 }, .{ 0, 0.1 },
-    }, 256, .z, .{ 0, 0, 0 }, null);
-}
+    lathe(m, &.{ .{ 0, floor_z }, .{ 16.5, floor_z }, .{ 17.6, 0.05 }, .{ 0, 0.05 } }, 192, .z, .{ 0, 0, 0 }, null);
 
-/// "Palisade" bezel: a ring of 72 knife-edge flutes around the outer wall.
-fn bezel(m: *Mesh) void {
-    m.object("bezel");
-    lathe(m, &.{
-        .{ 19.7, 8.15 },       .{ 19.7, 9.55 },       .{ 18.3, 10.5 },      .{ crystal_r + 0.7, 10.75 },
-        .{ crystal_r, 10.45 }, .{ crystal_r, 8.9 },   .{ 17.0, 8.15 },
-    }, 432, .z, .{ 0, 0, 0 }, .{
-        .teeth = 72,
-        .depth = 0.42,
-        .weight = &.{ 1, 1, 0.25, 0, 0, 0, 0 },
-    });
-
-    // Sloped inner flange between the crystal and the dial.
-    m.object("rehaut");
-    lathe(m, &.{
-        .{ dial_r - 0.05, dial_z }, .{ crystal_r, 8.9 }, .{ crystal_r + 0.4, 8.9 }, .{ crystal_r + 0.4, dial_z },
-    }, 256, .z, .{ 0, 0, 0 }, null);
-}
-
-fn crystal(m: *Mesh) void {
-    m.object("crystal");
-    const r = crystal_r - 0.02;
-    lathe(m, &.{
-        .{ 0, 8.95 }, .{ r, 8.95 }, .{ r, 10.5 }, .{ r - 0.5, 10.8 }, .{ 0, 10.8 },
-    }, 256, .z, .{ 0, 0, 0 }, null);
+    // Crown guards: a shoulder on the 3 o'clock side that the crown sits into.
+    m.object("crown_guard");
+    const guard = [_]V2{ .{ 18.0, -6.0 }, .{ 21.6, -5.0 }, .{ 22.6, -3.4 }, .{ 22.6, 3.4 }, .{ 21.6, 5.0 }, .{ 18.0, 6.0 } };
+    prism(m, &guard, 1.0, 5.0, 0.9);
 }
 
 fn crown(m: *Mesh) void {
     m.object("crown");
     lathe(m, &.{
-        .{ 0, 19.8 }, .{ 2.3, 19.8 }, .{ 2.3, 20.9 }, .{ 3.5, 21.3 },
-        .{ 3.5, 23.9 }, .{ 2.9, 24.5 }, .{ 0, 24.5 },
-    }, 240, .x, .{ 0, 0, 4.3 }, .{
-        .teeth = 20,
-        .depth = 0.38,
+        .{ 0, 20.0 },   .{ 2.2, 20.0 }, .{ 2.2, 22.5 }, .{ 3.3, 22.9 },
+        .{ 3.3, 25.6 }, .{ 2.8, 26.1 }, .{ 0, 26.1 },
+    }, 240, .x, .{ 0, 0, 3.5 }, .{
+        .teeth = 24,
+        .depth = 0.32,
         .weight = &.{ 0, 0, 0, 1, 1, 0.3, 0 },
     });
 }
 
-/// Four angular lugs. Each is a side profile whose outer face is lower than
-/// its inner face, giving a sloped top facet that echoes the emblem shards.
-fn lugs(m: *Mesh) void {
-    m.object("lugs");
-    const inner = [_]V2{ // (y, z) at the strap side
-        .{ 12.0, 7.0 }, .{ 18.8, 6.6 }, .{ 24.2, 2.6 }, .{ 24.6, 0.4 }, .{ 23.2, -0.3 }, .{ 12.0, 0.1 },
-    };
-    const outer = [_]V2{ // (y, z) at the outside
-        .{ 12.0, 4.6 }, .{ 17.2, 4.3 }, .{ 21.8, 1.9 }, .{ 22.2, 0.7 }, .{ 21.4, 0.1 }, .{ 12.0, 0.3 },
-    };
-    const x_in: f32 = lug_gap / 2.0 + 0.1;
-    const x_out: f32 = x_in + 4.6;
-    for ([_]f32{ 1, -1 }) |sx| {
-        for ([_]f32{ 1, -1 }) |sy| {
-            var a: [6]V3 = undefined;
-            var b: [6]V3 = undefined;
-            for (inner, 0..) |p, i| a[i] = .{ sx * x_in, sy * p[0], p[1] };
-            for (outer, 0..) |p, i| b[i] = .{ sx * x_out, sy * p[0], p[1] };
-            loft(m, &a, &b);
-        }
-    }
+fn bezel(m: *Mesh) void {
+    // Rotating bezel with a coin edge.
+    m.object("bezel");
+    lathe(m, &.{
+        .{ 20.35, 7.05 },    .{ 20.35, 9.1 }, .{ 19.6, 9.85 },  .{ 19.15, 9.85 },
+        .{ 19.15, 9.5 },     .{ 16.0, 9.5 },  .{ 16.0, 10.05 }, .{ crystal_r, 10.05 },
+        .{ crystal_r, 8.9 }, .{ 17.5, 7.05 },
+    }, 720, .z, .{ 0, 0, 0 }, .{
+        .teeth = 120,
+        .depth = 0.3,
+        .weight = &.{ 1, 1, 0.4, 0, 0, 0, 0, 0, 0, 0 },
+    });
+
+    // Black insert sitting in the bezel's channel.
+    m.object("insert");
+    lathe(m, &.{ .{ 16.02, 9.4 }, .{ 19.13, 9.4 }, .{ 19.13, 9.82 }, .{ 16.02, 9.98 } }, 256, .z, .{ 0, 0, 0 }, null);
+
+    // Luminous triangle at 12 on the insert.
+    m.object("insert_pip");
+    prism(m, &.{ .{ -1.25, 18.75 }, .{ 0, 16.5 }, .{ 1.25, 18.75 } }, 9.8, 0.2, 0.95);
+
+    // Sloped flange between the crystal and the dial.
+    m.object("rehaut");
+    lathe(m, &.{
+        .{ dial_r - 0.05, dial_z }, .{ crystal_r, 8.9 }, .{ crystal_r + 0.4, 8.9 }, .{ crystal_r + 0.4, dial_z },
+    }, 256, .z, .{ 0, 0, 0 }, null);
+
+    m.object("crystal");
+    const r = crystal_r - 0.02;
+    lathe(m, &.{ .{ 0, 8.95 }, .{ r, 8.95 }, .{ r, 10.15 }, .{ r - 0.35, 10.4 }, .{ 0, 10.4 } }, 256, .z, .{ 0, 0, 0 }, null);
+}
+
+// ---------------------------------------------------------------- dial
+
+fn emblemPoint(p: V2) V2 {
+    return .{ (p[0] - emblem_centre[0]) * emblem_scale, -(p[1] - emblem_centre[1]) * emblem_scale };
 }
 
 fn dial(m: *Mesh) void {
     m.object("dial");
-    lathe(m, &.{ .{ 0, dial_z }, .{ dial_r, dial_z }, .{ dial_r, dial_z - 0.4 }, .{ 0, dial_z - 0.4 } }, 256, .z, .{ 0, 0, 0 }, null);
-}
+    lathe(m, &.{
+        .{ 0, dial_z }, .{ dial_r, dial_z }, .{ dial_r, dial_z - dial_thickness }, .{ 0, dial_z - dial_thickness },
+    }, 256, .z, .{ 0, 0, 0 }, null);
 
-fn emblem(m: *Mesh) void {
-    m.object("emblem");
+    // One cutter per shard, passing right through the dial plate.
+    m.object("cut_emblem");
     for (shards) |shard| {
         var pts: [8]V2 = undefined;
-        for (shard, 0..) |p, i| {
-            pts[i] = .{
-                emblem_focal_mm[0] + (p[0] - emblem_focal_svg[0]) * emblem_scale,
-                emblem_focal_mm[1] - (p[1] - emblem_focal_svg[1]) * emblem_scale,
-            };
-        }
-        tent(m, pts[0..shard.len], dial_z, emblem_height, 0.45);
+        for (shard, 0..) |p, i| pts[i] = emblemPoint(p);
+        prism(m, pts[0..shard.len], dial_z - dial_thickness - 0.3, dial_thickness + 0.6, 1.0);
+    }
+
+    // Printed minute track.
+    m.object("print");
+    var i: u32 = 0;
+    while (i < 60) : (i += 1) {
+        if (i % 5 == 0) continue;
+        const deg = @as(f32, @floatFromInt(i)) * 6.0;
+        const tick = clockAll(4, .{ .{ -0.06, 13.6 }, .{ 0.06, 13.6 }, .{ 0.06, 14.3 }, .{ -0.06, 14.3 } }, deg);
+        prism(m, &tick, dial_z, 0.012, 1.0);
     }
 }
 
-/// Hour markers as small faceted shards. 3 o'clock is left out: the emblem's
-/// long blade ends there and does that job.
+/// Applied hour markers: a polished steel surround filled with lume. 3 and 9
+/// are left out because the emblem reaches the edge there.
 fn markers(m: *Mesh) void {
-    m.object("markers");
+    const r: f32 = 12.2;
     var h: u32 = 0;
     while (h < 12) : (h += 1) {
-        if (h == 3) continue;
+        if (h == 3 or h == 9) continue;
         const deg = @as(f32, @floatFromInt(h)) * 30.0;
-        const cardinal = h % 3 == 0;
-        const r_in: f32 = if (cardinal) 11.0 else 11.7;
-        const w: f32 = if (cardinal) 1.9 else 1.3;
-        kite(m, deg, r_in, 13.8, 13.0, w, dial_z, 0.6);
+        if (h == 0) {
+            m.object("marker_steel");
+            prism(m, &clockAll(3, .{ .{ -1.7, 13.6 }, .{ 1.7, 13.6 }, .{ 0, 10.2 } }, deg), dial_z, 0.4, 0.97);
+            m.object("marker_lume");
+            prism(m, &clockAll(3, .{ .{ -1.2, 13.25 }, .{ 1.2, 13.25 }, .{ 0, 10.85 } }, deg), dial_z, 0.46, 0.97);
+        } else if (h == 6) {
+            m.object("marker_steel");
+            prism(m, &clockAll(4, .{ .{ -0.85, 10.3 }, .{ 0.85, 10.3 }, .{ 0.85, 13.6 }, .{ -0.85, 13.6 } }, deg), dial_z, 0.4, 0.97);
+            m.object("marker_lume");
+            prism(m, &clockAll(4, .{ .{ -0.55, 10.6 }, .{ 0.55, 10.6 }, .{ 0.55, 13.3 }, .{ -0.55, 13.3 } }, deg), dial_z, 0.46, 0.97);
+        } else {
+            const c = clock(.{ 0, r }, deg);
+            m.object("marker_steel");
+            lathe(m, &.{ .{ 0, 0 }, .{ 1.1, 0 }, .{ 1.1, 0.34 }, .{ 0.98, 0.4 }, .{ 0, 0.4 } }, 48, .z, .{ c[0], c[1], dial_z }, null);
+            m.object("marker_lume");
+            lathe(m, &.{ .{ 0, 0 }, .{ 0.8, 0 }, .{ 0.8, 0.46 }, .{ 0, 0.46 } }, 48, .z, .{ c[0], c[1], dial_z }, null);
+        }
     }
+}
+
+fn swordHand(m: *Mesh, deg: f32, len: f32, w: f32, z: f32) void {
+    m.object("hand_steel");
+    const body = clockAll(5, .{
+        .{ -0.32 * w, -1.9 }, .{ 0.32 * w, -1.9 }, .{ 0.5 * w, 0.76 * len }, .{ 0, len }, .{ -0.5 * w, 0.76 * len },
+    }, deg);
+    prism(m, &body, z, 0.2, 0.96);
+    m.object("hand_lume");
+    const fill = clockAll(5, .{
+        .{ -0.2 * w, 0.24 * len }, .{ 0.2 * w, 0.24 * len }, .{ 0.3 * w, 0.73 * len }, .{ 0, 0.9 * len }, .{ -0.3 * w, 0.73 * len },
+    }, deg);
+    prism(m, &fill, z + 0.19, 0.04, 1.0);
 }
 
 fn hands(m: *Mesh) void {
     const hour_deg: f32 = (10.0 + 9.0 / 60.0) * 30.0;
     const minute_deg: f32 = 9.0 * 6.0;
-    const second_deg: f32 = 37.0 * 6.0;
+    const second_deg: f32 = 36.0 * 6.0;
 
-    m.object("hand_hour");
-    kite(m, hour_deg, -1.8, 7.8, 1.6, 1.9, dial_z + 0.75, 0.28);
-    m.object("hand_minute");
-    kite(m, minute_deg, -2.2, 12.2, 1.8, 1.5, dial_z + 1.08, 0.28);
+    swordHand(m, hour_deg, 7.4, 2.0, dial_z + 0.7);
+    swordHand(m, minute_deg, 11.8, 1.5, dial_z + 1.0);
 
-    m.object("hand_second");
-    const needle = [_]V2{
-        clock(.{ -0.12, -3.4 }, second_deg), clock(.{ 0.12, -3.4 }, second_deg),
-        clock(.{ 0.07, 13.0 }, second_deg),  clock(.{ -0.07, 13.0 }, second_deg),
-    };
-    tent(m, &needle, dial_z + 1.42, 0.1, 1.0);
-    // Counterweight: a small shard on the tail of the seconds hand.
-    kite(m, second_deg + 180.0, 2.0, 5.2, 4.3, 1.1, dial_z + 1.42, 0.1);
+    m.object("hand_steel");
+    const needle = clockAll(4, .{ .{ -0.11, -3.4 }, .{ 0.11, -3.4 }, .{ 0.06, 13.2 }, .{ -0.06, 13.2 } }, second_deg);
+    prism(m, &needle, dial_z + 1.3, 0.1, 1.0);
+    const dot = clock(.{ 0, 9.0 }, second_deg);
+    lathe(m, &.{ .{ 0, 0 }, .{ 0.62, 0 }, .{ 0.62, 0.1 }, .{ 0, 0.1 } }, 32, .z, .{ dot[0], dot[1], dial_z + 1.3 }, null);
+    m.object("hand_lume");
+    lathe(m, &.{ .{ 0, 0 }, .{ 0.42, 0 }, .{ 0.42, 0.03 }, .{ 0, 0.03 } }, 32, .z, .{ dot[0], dot[1], dial_z + 1.4 }, null);
 
-    m.object("hand_cap");
-    lathe(m, &.{ .{ 0, dial_z }, .{ 0.95, dial_z }, .{ 0.95, dial_z + 1.6 }, .{ 0.7, dial_z + 1.75 }, .{ 0, dial_z + 1.75 } }, 64, .z, .{ 0, 0, 0 }, null);
+    m.object("hand_steel");
+    lathe(m, &.{ .{ 0, dial_z - 0.5 }, .{ 0.9, dial_z - 0.5 }, .{ 0.9, dial_z + 1.45 }, .{ 0.7, dial_z + 1.6 }, .{ 0, dial_z + 1.6 } }, 64, .z, .{ 0, 0, 0 }, null);
 }
 
-/// Two strap halves lying flat on the surface.
-fn strap(m: *Mesh) void {
-    m.object("strap");
-    const path = [_][3]f32{ // (y, z of centreline, thickness)
-        .{ 20.6, 2.9, 3.0 }, .{ 23.2, 2.6, 3.0 }, .{ 26.5, 1.3, 2.8 }, .{ 30.0, 0.3, 2.6 },
-        .{ 34.0, 0.05, 2.5 }, .{ 60.0, 0.0, 2.4 }, .{ 110.0, 0.0, 2.4 },
+// ---------------------------------------------------------------- movement
+
+fn gear(m: *Mesh, name: []const u8, c: V2, r: f32, teeth: u32, z0: f32) void {
+    m.object(name);
+    lathe(m, &.{ .{ r * 0.74, 0 }, .{ r, 0 }, .{ r, 0.3 }, .{ r * 0.74, 0.3 } }, teeth * 6, .z, .{ c[0], c[1], z0 }, .{
+        .teeth = @floatFromInt(teeth),
+        .depth = r * 0.1,
+        .weight = &.{ 0, 1, 1, 0 },
+    });
+    lathe(m, &.{ .{ 0, 0 }, .{ r * 0.24, 0 }, .{ r * 0.24, 0.34 }, .{ 0, 0.34 } }, 32, .z, .{ c[0], c[1], z0 }, null);
+    var i: u32 = 0;
+    while (i < 5) : (i += 1) {
+        const deg = 72.0 * @as(f32, @floatFromInt(i));
+        var spoke = clockAll(4, .{ .{ -r * 0.07, 0 }, .{ r * 0.07, 0 }, .{ r * 0.07, r * 0.8 }, .{ -r * 0.07, r * 0.8 } }, deg);
+        for (&spoke) |*p| p.* = .{ p[0] + c[0], p[1] + c[1] };
+        prism(m, &spoke, z0, 0.3, 1.0);
+    }
+    m.object("mov_ruby");
+    lathe(m, &.{ .{ 0, 0 }, .{ r * 0.1, 0 }, .{ r * 0.1, 0.4 }, .{ 0, 0.4 } }, 24, .z, .{ c[0], c[1], z0 }, null);
+}
+
+/// A simplified mechanism under the dial: enough to read as gears and jewels
+/// through the emblem windows. Not a real calibre.
+fn movement(m: *Mesh) void {
+    const top: f32 = dial_z - dial_thickness - 0.75;
+    m.object("mov_plate");
+    lathe(m, &.{ .{ 0, top - 1.0 }, .{ dial_r + 0.3, top - 1.0 }, .{ dial_r + 0.3, top }, .{ 0, top } }, 128, .z, .{ 0, 0, 0 }, null);
+
+    gear(m, "mov_brass", .{ -7.4, 3.2 }, 5.2, 40, top + 0.02);
+    gear(m, "mov_steel", .{ -10.2, -3.0 }, 3.4, 26, top + 0.28);
+    gear(m, "mov_brass", .{ -1.6, -3.6 }, 4.0, 30, top + 0.02);
+    gear(m, "mov_steel", .{ 4.6, 0.6 }, 3.6, 28, top + 0.28);
+    gear(m, "mov_brass", .{ 10.2, -0.6 }, 2.6, 20, top + 0.02);
+    gear(m, "mov_steel", .{ -3.6, 4.6 }, 2.4, 18, top + 0.3);
+}
+
+// ---------------------------------------------------------------- bracelet
+
+/// Three-link bracelet lying flat on the surface on both sides of the case.
+fn bracelet(m: *Mesh) void {
+    const link_h: f32 = 3.0;
+    const zc: f32 = floor_z + 0.1 + link_h / 2.0;
+    const pitch: f32 = 5.0;
+    // Rounded link cross-section in (y, z), centred on the link.
+    const a: f32 = pitch / 2.0 - 0.12;
+    const b: f32 = link_h / 2.0;
+    const c: f32 = 0.9;
+    const section = [_]V2{
+        .{ -a, -b + c }, .{ -a + c, -b }, .{ a - c, -b }, .{ a, -b + c },
+        .{ a, b - c },   .{ a - c, b },   .{ -a + c, b }, .{ -a, b - c },
     };
+
     for ([_]f32{ 1, -1 }) |sy| {
-        const base = m.nv + 1;
-        for (path, 0..) |p, i| {
-            const taper = @min(1.0, @as(f32, @floatFromInt(i)) / 5.0);
-            const half = (lug_gap - 0.3 - 2.0 * taper) / 2.0;
-            const zc = floor_z + p[2] / 2.0 + p[1];
-            _ = m.v(.{ -half, sy * p[0], zc + p[2] / 2.0 });
-            _ = m.v(.{ half, sy * p[0], zc + p[2] / 2.0 });
-            _ = m.v(.{ half, sy * p[0], zc - p[2] / 2.0 });
-            _ = m.v(.{ -half, sy * p[0], zc - p[2] / 2.0 });
-        }
-        var i: u32 = 0;
-        while (i + 1 < path.len) : (i += 1) {
-            var k: u32 = 0;
-            while (k < 4) : (k += 1) {
-                const knext = (k + 1) % 4;
-                m.quad(base + i * 4 + k, base + i * 4 + knext, base + (i + 1) * 4 + knext, base + (i + 1) * 4 + k);
+        // End link filling the gap between the lugs.
+        m.object("bracelet");
+        extrudeX(m, &.{ .{ 16.0, 0.2 }, .{ 21.4, 0.2 }, .{ 22.0, 0.9 }, .{ 22.0, 2.6 }, .{ 20.2, 4.0 }, .{ 16.0, 6.4 } }, -9.85, 9.85, sy);
+
+        var row: u32 = 0;
+        while (row < 12) : (row += 1) {
+            const y = 24.6 + pitch * @as(f32, @floatFromInt(row));
+            const taper = @min(1.0, @as(f32, @floatFromInt(row)) / 6.0);
+            const half = 9.9 - 1.0 * taper;
+            const mid = half * 0.42;
+            var outer: [8]V2 = undefined;
+            var inner: [8]V2 = undefined;
+            for (section, 0..) |p, i| {
+                outer[i] = .{ y + p[0], zc + p[1] };
+                inner[i] = .{ y + pitch / 2.0 + p[0], zc + p[1] };
             }
+            m.object("bracelet");
+            extrudeX(m, &outer, -half, -mid - 0.08, sy);
+            extrudeX(m, &outer, mid + 0.08, half, sy);
+            m.object("bracelet_mid");
+            extrudeX(m, &inner, -mid, mid, sy);
         }
-        m.ngon(base, 4, false);
-        m.ngon(base + (@as(u32, path.len) - 1) * 4, 4, true);
     }
 }
 
@@ -367,15 +550,13 @@ pub fn main(init: std.process.Init) !void {
     var mesh = Mesh{ .gpa = init.arena.allocator() };
 
     caseBody(&mesh);
-    bezel(&mesh);
-    lugs(&mesh);
     crown(&mesh);
-    crystal(&mesh);
+    bezel(&mesh);
+    movement(&mesh);
     dial(&mesh);
-    emblem(&mesh);
     markers(&mesh);
     hands(&mesh);
-    strap(&mesh);
+    bracelet(&mesh);
 
     const cwd = std.Io.Dir.cwd();
     try cwd.createDirPath(io, "out");
