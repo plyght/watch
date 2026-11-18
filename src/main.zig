@@ -213,6 +213,14 @@ fn lugDrop(y: f32) f32 {
     return 4.3 * std.math.pow(f32, t, 1.7);
 }
 
+/// Crown guards: the case swells gently outward around the crown at 3 o'clock.
+fn crownSwell(p: V2) f32 {
+    const reach: f32 = 6.5;
+    if (p[0] < 0 or @abs(p[1]) >= reach) return 0;
+    const c = @cos(p[1] / reach * tau / 4.0);
+    return 1.9 * c * c;
+}
+
 /// Top-view outline of the case with its four lugs, counter-clockwise.
 fn caseOutline(buf: []V2) usize {
     // One quadrant, from 12 o'clock round to 3 o'clock.
@@ -244,8 +252,8 @@ fn caseOutline(buf: []V2) usize {
         n += 1;
     }
     i = 0;
-    while (i < 8) : (i += 1) { // arc down to 3 o'clock
-        const a = a_out + (tau / 4.0 - a_out) * @as(f32, @floatFromInt(i)) / 8.0;
+    while (i < 20) : (i += 1) { // arc down to 3 o'clock
+        const a = a_out + (tau / 4.0 - a_out) * @as(f32, @floatFromInt(i)) / 20.0;
         q[n] = .{ case_r * @sin(a), case_r * @cos(a) };
         n += 1;
     }
@@ -273,6 +281,7 @@ fn caseOutline(buf: []V2) usize {
         buf[total] = .{ -q[i - 1][0], q[i - 1][1] };
         total += 1;
     }
+    for (buf[0..total]) |*p| p[0] += crownSwell(p.*);
     std.mem.reverse(V2, buf[0..total]);
     return total;
 }
@@ -324,11 +333,6 @@ fn caseBody(m: *Mesh) void {
 
     m.object("case_back");
     lathe(m, &.{ .{ 0, floor_z }, .{ 16.5, floor_z }, .{ 17.6, 0.05 }, .{ 0, 0.05 } }, 192, .z, .{ 0, 0, 0 }, null);
-
-    // Crown guards: a shoulder on the 3 o'clock side that the crown sits into.
-    m.object("crown_guard");
-    const guard = [_]V2{ .{ 18.0, -6.0 }, .{ 21.6, -5.0 }, .{ 22.6, -3.4 }, .{ 22.6, 3.4 }, .{ 21.6, 5.0 }, .{ 18.0, 6.0 } };
-    prism(m, &guard, 1.0, 5.0, 0.9);
 }
 
 fn crown(m: *Mesh) void {
@@ -336,7 +340,7 @@ fn crown(m: *Mesh) void {
     lathe(m, &.{
         .{ 0, 20.0 },   .{ 2.2, 20.0 }, .{ 2.2, 22.5 }, .{ 3.3, 22.9 },
         .{ 3.3, 25.6 }, .{ 2.8, 26.1 }, .{ 0, 26.1 },
-    }, 240, .x, .{ 0, 0, 3.5 }, .{
+    }, 240, .x, .{ 1.3, 0, 3.5 }, .{
         .teeth = 24,
         .depth = 0.32,
         .weight = &.{ 0, 0, 0, 1, 1, 0.3, 0 },
@@ -406,43 +410,70 @@ fn dial(m: *Mesh) void {
     }
 }
 
-/// Applied hour markers: a polished steel surround filled with lume. 3 and 9
-/// are left out because the emblem reaches the edge there.
+/// Applied hour markers shaped like shards of the emblem: a polished steel
+/// surround filled with lume. 3 and 9 are left out because the emblem reaches
+/// the edge there.
 fn markers(m: *Mesh) void {
-    const r: f32 = 12.2;
     var h: u32 = 0;
     while (h < 12) : (h += 1) {
         if (h == 3 or h == 9) continue;
         const deg = @as(f32, @floatFromInt(h)) * 30.0;
-        if (h == 0) {
-            m.object("marker_steel");
-            prism(m, &clockAll(3, .{ .{ -1.7, 13.6 }, .{ 1.7, 13.6 }, .{ 0, 10.2 } }, deg), dial_z, 0.4, 0.97);
-            m.object("marker_lume");
-            prism(m, &clockAll(3, .{ .{ -1.2, 13.25 }, .{ 1.2, 13.25 }, .{ 0, 10.85 } }, deg), dial_z, 0.46, 0.97);
-        } else if (h == 6) {
-            m.object("marker_steel");
-            prism(m, &clockAll(4, .{ .{ -0.85, 10.3 }, .{ 0.85, 10.3 }, .{ 0.85, 13.6 }, .{ -0.85, 13.6 } }, deg), dial_z, 0.4, 0.97);
-            m.object("marker_lume");
-            prism(m, &clockAll(4, .{ .{ -0.55, 10.6 }, .{ 0.55, 10.6 }, .{ 0.55, 13.3 }, .{ -0.55, 13.3 } }, deg), dial_z, 0.46, 0.97);
-        } else {
-            const c = clock(.{ 0, r }, deg);
-            m.object("marker_steel");
-            lathe(m, &.{ .{ 0, 0 }, .{ 1.1, 0 }, .{ 1.1, 0.34 }, .{ 0.98, 0.4 }, .{ 0, 0.4 } }, 48, .z, .{ c[0], c[1], dial_z }, null);
-            m.object("marker_lume");
-            lathe(m, &.{ .{ 0, 0 }, .{ 0.8, 0 }, .{ 0.8, 0.46 }, .{ 0, 0.46 } }, 48, .z, .{ c[0], c[1], dial_z }, null);
+        const inner: f32 = if (h == 0) 9.6 else if (h == 6) 10.2 else 11.0;
+        const w: f32 = if (h == 0) 1.7 else 0.95;
+        const outline = clockAll(4, .{ .{ -w, 13.7 }, .{ w, 13.7 }, .{ w * 0.35, inner }, .{ -w * 0.45, inner + 0.9 } }, deg);
+        m.object("marker_steel");
+        prism(m, &outline, dial_z, 0.4, 0.97);
+        m.object("marker_lume");
+        prism(m, &outline, dial_z + 0.38, 0.1, 0.66);
+    }
+}
+
+/// Fine polished lines running on from each shard's tip to the edge of the
+/// dial, as if the dial had cracked outward from the emblem.
+fn fractures(m: *Mesh) void {
+    m.object("fracture");
+    const focal = emblemPoint(.{ 114.0, 266.0 });
+    for (shards) |shard| {
+        var best: f32 = 0;
+        var tip = V2{ 0, 0 };
+        for (shard) |sp| {
+            const p = emblemPoint(sp);
+            const d = (p[0] - focal[0]) * (p[0] - focal[0]) + (p[1] - focal[1]) * (p[1] - focal[1]);
+            if (d > best) {
+                best = d;
+                tip = p;
+            }
         }
+        const len = @sqrt(best);
+        const dx = (tip[0] - focal[0]) / len;
+        const dy = (tip[1] - focal[1]) / len;
+        // Walk outward from the tip until the line reaches the minute track.
+        var reach: f32 = 0;
+        while (reach < 40.0) : (reach += 0.05) {
+            const x = tip[0] + dx * reach;
+            const y = tip[1] + dy * reach;
+            if (x * x + y * y > 13.4 * 13.4) break;
+        }
+        if (reach < 0.3) continue;
+        const hw: f32 = 0.045;
+        prism(m, &.{
+            .{ tip[0] - dy * hw, tip[1] + dx * hw },
+            .{ tip[0] + dy * hw, tip[1] - dx * hw },
+            .{ tip[0] + dx * reach + dy * hw, tip[1] + dy * reach - dx * hw },
+            .{ tip[0] + dx * reach - dy * hw, tip[1] + dy * reach + dx * hw },
+        }, dial_z, 0.015, 1.0);
     }
 }
 
 fn swordHand(m: *Mesh, deg: f32, len: f32, w: f32, z: f32) void {
     m.object("hand_steel");
     const body = clockAll(5, .{
-        .{ -0.32 * w, -1.9 }, .{ 0.32 * w, -1.9 }, .{ 0.5 * w, 0.76 * len }, .{ 0, len }, .{ -0.5 * w, 0.76 * len },
+        .{ -0.28 * w, -1.9 }, .{ 0.28 * w, -1.9 }, .{ 0.5 * w, 0.22 * len }, .{ 0, len }, .{ -0.5 * w, 0.22 * len },
     }, deg);
     prism(m, &body, z, 0.2, 0.96);
     m.object("hand_lume");
     const fill = clockAll(5, .{
-        .{ -0.2 * w, 0.24 * len }, .{ 0.2 * w, 0.24 * len }, .{ 0.3 * w, 0.73 * len }, .{ 0, 0.9 * len }, .{ -0.3 * w, 0.73 * len },
+        .{ -0.16 * w, 0.14 * len }, .{ 0.16 * w, 0.14 * len }, .{ 0.3 * w, 0.26 * len }, .{ 0, 0.86 * len }, .{ -0.3 * w, 0.26 * len },
     }, deg);
     prism(m, &fill, z + 0.19, 0.04, 1.0);
 }
@@ -452,10 +483,10 @@ fn hands(m: *Mesh) void {
     const minute_deg: f32 = 9.0 * 6.0;
     const second_deg: f32 = 36.0 * 6.0;
 
-    swordHand(m, hour_deg, 7.4, 2.0, dial_z + 0.7);
-    swordHand(m, minute_deg, 11.8, 1.5, dial_z + 1.0);
+    swordHand(m, hour_deg, 7.6, 2.3, dial_z + 0.7);
+    swordHand(m, minute_deg, 12.2, 1.8, dial_z + 1.0);
 
-    m.object("hand_steel");
+    m.object("hand_accent");
     const needle = clockAll(4, .{ .{ -0.11, -3.4 }, .{ 0.11, -3.4 }, .{ 0.06, 13.2 }, .{ -0.06, 13.2 } }, second_deg);
     prism(m, &needle, dial_z + 1.3, 0.1, 1.0);
     const dot = clock(.{ 0, 9.0 }, second_deg);
@@ -491,15 +522,15 @@ fn gear(m: *Mesh, name: []const u8, c: V2, r: f32, teeth: u32, z0: f32) void {
 /// A simplified mechanism under the dial: enough to read as gears and jewels
 /// through the emblem windows. Not a real calibre.
 fn movement(m: *Mesh) void {
-    const top: f32 = dial_z - dial_thickness - 0.75;
+    const top: f32 = dial_z - dial_thickness - 0.45;
     m.object("mov_plate");
     lathe(m, &.{ .{ 0, top - 1.0 }, .{ dial_r + 0.3, top - 1.0 }, .{ dial_r + 0.3, top }, .{ 0, top } }, 128, .z, .{ 0, 0, 0 }, null);
 
-    gear(m, "mov_brass", .{ -7.4, 3.2 }, 5.2, 40, top + 0.02);
+    gear(m, "mov_bright", .{ -7.4, 3.2 }, 5.2, 40, top + 0.02);
     gear(m, "mov_steel", .{ -10.2, -3.0 }, 3.4, 26, top + 0.28);
-    gear(m, "mov_brass", .{ -1.6, -3.6 }, 4.0, 30, top + 0.02);
+    gear(m, "mov_bright", .{ -1.6, -3.6 }, 4.0, 30, top + 0.02);
     gear(m, "mov_steel", .{ 4.6, 0.6 }, 3.6, 28, top + 0.28);
-    gear(m, "mov_brass", .{ 10.2, -0.6 }, 2.6, 20, top + 0.02);
+    gear(m, "mov_bright", .{ 10.2, -0.6 }, 2.6, 20, top + 0.02);
     gear(m, "mov_steel", .{ -3.6, 4.6 }, 2.4, 18, top + 0.3);
 }
 
@@ -555,6 +586,7 @@ pub fn main(init: std.process.Init) !void {
     movement(&mesh);
     dial(&mesh);
     markers(&mesh);
+    fractures(&mesh);
     hands(&mesh);
     bracelet(&mesh);
 

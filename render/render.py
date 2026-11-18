@@ -143,17 +143,20 @@ def build_scene(samples, size):
         "lume": principled("lume", (0.82, 0.86, 0.78), 0.0, 0.7),
         "print": principled("print", (0.85, 0.85, 0.83), 0.0, 0.5),
         "glass": glass_material(),
-        "brass": principled("brass", (0.83, 0.61, 0.27), 1.0, 0.25),
-        "plate": brushed("plate", (0.78, 0.60, 0.30), 0.35, (40, 40, 40)),
+        "bright": principled("bright", (0.85, 0.85, 0.86), 0.5, 0.35),
+        "dark": principled("dark", (0.16, 0.16, 0.17), 1.0, 0.3),
+        "accent": principled("accent", (0.80, 0.07, 0.015), 0.0, 0.4),
+        "plate": principled("plate", (0.62, 0.62, 0.63), 0.0, 0.6),
         "ruby": principled("ruby", (0.55, 0.01, 0.05), 0.0, 0.1),
         "floor": principled("floor", (0.55, 0.55, 0.53), 0.0, 0.5),
     }
     assign = {
-        "case_mid": "brushed", "case_back": "satin", "crown_guard": "brushed", "crown": "polished",
+        "case_mid": "brushed", "case_back": "satin", "crown": "polished",
         "bezel": "polished", "insert": "insert", "insert_pip": "lume", "rehaut": "rehaut",
         "crystal": "glass", "dial": "dial", "cut_emblem": "polished", "print": "print",
         "marker_steel": "polished", "marker_lume": "lume", "hand_steel": "polished", "hand_lume": "lume",
-        "mov_plate": "plate", "mov_brass": "brass", "mov_steel": "satin", "mov_ruby": "ruby",
+        "mov_plate": "plate", "mov_bright": "bright", "mov_steel": "dark", "mov_ruby": "ruby",
+        "fracture": "polished", "hand_accent": "accent",
         "bracelet": "brushed", "bracelet_mid": "satin",
     }
 
