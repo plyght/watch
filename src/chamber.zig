@@ -51,12 +51,15 @@ const dial_z: f32 = 6.6; // dial ground; relief rises above it
 const relief: f32 = 0.35;
 const dial_under: f32 = 0.4;
 
-const chamber_ring: f32 = 12.0;
-const chamber_hole: f32 = 4.3;
-const bullet_pos = V2{ 0, -11.25 };
-const bullet_hole: f32 = 4.0;
-const bullet_rim: f32 = 4.45;
-const silver_inner: f32 = 9.6;
+// The cylinder artwork is scaled in from the photo's proportions so it sits
+// clear of the bezel with a black margin all round (client's call).
+const art: f32 = 0.92;
+const chamber_ring: f32 = 12.0 * art;
+const chamber_hole: f32 = 4.3 * art;
+const bullet_pos = V2{ 0, -11.25 * art };
+const bullet_hole: f32 = 4.0 * art;
+const bullet_rim: f32 = 4.45 * art;
+const silver_inner: f32 = 9.6 * art;
 
 // The reference photo reads about 1:38:03.
 const hour_deg: f32 = (1.0 + 38.0 / 60.0) * 30.0;
@@ -67,15 +70,7 @@ const second_deg: f32 = 3.0 * 6.0;
 
 fn caseBody(m: *Mesh, variant: Variant) void {
     m.object("antique");
-    lathe(m, &.{
-        .{ 16.8, 0 }, .{ 20.3, 0 }, .{ 21.0, 0.7 }, .{ 21.0, 5.1 }, .{ 20.6, mid_top }, .{ 16.8, mid_top },
-    }, 256, .z, .{ 0, 0, 0 }, null);
-
-    // Four horn lugs: straight on the bracelet side, flaring outward into
-    // the case (shape from the client's trace of the reference photo).
-    for ([_]f32{ 1, -1 }) |sx| {
-        for ([_]f32{ 1, -1 }) |sy| hornLug(m, sx, sy);
-    }
+    caseSolid(m);
 
     // Seat under the bezel, and the flange that holds the crystal.
     lathe(m, &.{ .{ 17.9, mid_top - 0.05 }, .{ 20.9, mid_top - 0.05 }, .{ 20.9, mid_top + 0.35 }, .{ 17.9, mid_top + 0.35 } }, 256, .z, .{ 0, 0, 0 }, null);
@@ -111,82 +106,158 @@ fn caseBody(m: *Mesh, variant: Variant) void {
     }, 256, .z, .{ 0, 0, 0 }, null);
 }
 
-/// A section through a lug: vertical sides, a flat top and generously
-/// rounded top edges (`r` across the top, smaller at the bottom).
-fn lugSection(buf: *[12]V2, x0: f32, x1: f32, top: f32, r: f32) []const V2 {
-    const rb: f32 = 0.35;
-    const k: f32 = 0.2929; // 1 - cos 45°
-    buf.* = .{
-        .{ x0, rb },                    .{ x0 + rb, 0 },               .{ x1 - rb, 0 },          .{ x1, rb },
-        .{ x1, top - r },               .{ x1 - r * k, top - r * k },  .{ x1 - r, top },         .{ x0 + r, top },
-        .{ x0 + r * k, top - r * k },   .{ x0, top - r },              .{ x0, top - r },         .{ x0, rb },
-    };
-    return buf[0..10];
-}
+// ---------------------------------------------------------------- case shape
+//
+// The mid-case and its four lugs are one solid, like the machined original:
+// a single top-view outline (case circle, lug faces and the tangent fillets
+// between them) swept with one vertical profile, so every surface flows into
+// the next with no seams.
 
-/// The concave fillet joining a lug's straight outer face (x = lug_outer) to
-/// the round case (r = case_r): a circle of radius `rho` tangent to both. Its
-/// centre sits rho outside the face and rho outside the case circle.
-const Fillet = struct {
-    centre: V2,
-    tangent: V2, // where the fillet meets the case circle
-};
-const fillet_rho: f32 = 5.5;
-const fillet: Fillet = blk: {
-    const cx = lug_outer + fillet_rho;
-    const cy = @sqrt((case_r + fillet_rho) * (case_r + fillet_rho) - cx * cx);
-    const k = case_r / (case_r + fillet_rho);
-    break :blk .{ .centre = .{ cx, cy }, .tangent = .{ cx * k, cy * k } };
-};
+const fillet_in: f32 = 0.9; // between the case and a lug's inner face
+const taper_r: f32 = 60.0; // the lug's outer face: one concave arc from the tip into the case
+const lug_outer_tip: f32 = 12.9; // outer face at the tip (lugs taper toward the bracelet)
+const tip_round: f32 = 0.7; // lug tip corners, in plan
+const edge_round: f32 = 0.8; // the rounded top edge all the way round
 
-/// x of a lug's outer face at height y along the lug: on the case circle
-/// below the fillet, on the fillet arc, then straight to the tip.
-fn lugOuterEdge(y: f32) f32 {
-    if (y >= fillet.centre[1]) return lug_outer;
-    if (y >= fillet.tangent[1]) {
-        const dy = y - fillet.centre[1];
-        return fillet.centre[0] - @sqrt(fillet_rho * fillet_rho - dy * dy);
+fn arc(buf: []V2, n: *usize, c: V2, r: f32, a0: f32, a1: f32, steps: u32) void {
+    var i: u32 = 1;
+    while (i <= steps) : (i += 1) {
+        const a = a0 + (a1 - a0) * @as(f32, @floatFromInt(i)) / @as(f32, @floatFromInt(steps));
+        buf[n.*] = .{ c[0] + r * @cos(a), c[1] + r * @sin(a) };
+        n.* += 1;
     }
-    return @sqrt(@max(0.0, case_r * case_r - y * y)) + 0.05;
 }
 
-/// Four lugs like the reference: tall blocks with vertical sides, the outer
-/// face flaring gently into the case, the top rolling down smoothly into a
-/// rounded tip.
-fn hornLug(m: *Mesh, sx: f32, sy: f32) void {
-    const y0: f32 = fillet.tangent[1] - 0.6; // start just inside the case
-    const n: u32 = 64;
-    const roll: f32 = 2.2; // length of the rounded tip
-    var buf: [12]V2 = undefined;
+/// One quadrant of the outline, clockwise from 12 o'clock to 3 o'clock.
+fn quadrant(q: []V2) usize {
+    const R = case_r;
+    var n: usize = 0;
+    // Inner fillet: tangent to the lug's inner face and externally to the case.
+    const ci = V2{ lug_inner - fillet_in, @sqrt((R + fillet_in) * (R + fillet_in) - (lug_inner - fillet_in) * (lug_inner - fillet_in)) };
+    const ti = V2{ ci[0] * R / (R + fillet_in), ci[1] * R / (R + fillet_in) };
+    // Outer face: the arc of radius taper_r through the tip corner T that
+    // touches the case circle tangentially. Its centre C is taper_r from T
+    // and R + taper_r from the origin (circle-circle intersection).
+    const t = V2{ lug_outer_tip, lug_tip - tip_round };
+    const d = @sqrt(t[0] * t[0] + t[1] * t[1]);
+    const r1 = R + taper_r;
+    const along = (d * d + r1 * r1 - taper_r * taper_r) / (2.0 * d);
+    const h = @sqrt(r1 * r1 - along * along);
+    const co = V2{ t[0] * along / d + h * t[1] / d, t[1] * along / d - h * t[0] / d };
+    const to = V2{ co[0] * R / r1, co[1] * R / r1 };
+
+    // Case circle from 12 o'clock to the inner fillet.
+    const a_ti = std.math.atan2(ti[0], ti[1]);
+    var i: u32 = 0;
+    while (i < 24) : (i += 1) {
+        const a = a_ti * @as(f32, @floatFromInt(i)) / 24.0;
+        q[n] = .{ R * @sin(a), R * @cos(a) };
+        n += 1;
+    }
+    q[n] = ti;
+    n += 1;
+    arc(q, &n, ci, fillet_in, std.math.atan2(ti[1] - ci[1], ti[0] - ci[0]), 0, 10);
+    // Up the inner face, round the tip, down the outer face.
+    q[n] = .{ lug_inner, lug_tip - tip_round };
+    n += 1;
+    arc(q, &n, .{ lug_inner + tip_round, lug_tip - tip_round }, tip_round, std.math.pi, std.math.pi / 2.0, 6);
+    q[n] = .{ lug_outer_tip - tip_round, lug_tip };
+    n += 1;
+    arc(q, &n, .{ lug_outer_tip - tip_round, lug_tip - tip_round }, tip_round, std.math.pi / 2.0, 0, 6);
+    // Down the tapering outer face into the case.
+    arc(q, &n, co, taper_r, std.math.atan2(t[1] - co[1], t[0] - co[0]), std.math.atan2(to[1] - co[1], to[0] - co[0]), 40);
+    // Case circle on to 3 o'clock.
+    const a_to = std.math.atan2(to[0], to[1]);
+    i = 1;
+    while (i < 28) : (i += 1) {
+        const a = a_to + (tau / 4.0 - a_to) * @as(f32, @floatFromInt(i)) / 28.0;
+        q[n] = .{ R * @sin(a), R * @cos(a) };
+        n += 1;
+    }
+    return n;
+}
+
+/// The whole outline, counter-clockwise, mirrored from one quadrant.
+fn caseOutline(buf: []V2) usize {
+    var q: [256]V2 = undefined;
+    const n = quadrant(&q);
+    var total: usize = 0;
+    for (q[0..n]) |p| {
+        buf[total] = p;
+        total += 1;
+    }
+    buf[total] = .{ case_r, 0 };
+    total += 1;
+    var i: usize = n;
+    while (i > 1) : (i -= 1) {
+        buf[total] = .{ q[i - 1][0], -q[i - 1][1] };
+        total += 1;
+    }
+    for (q[0..n]) |p| {
+        buf[total] = .{ -p[0], -p[1] };
+        total += 1;
+    }
+    buf[total] = .{ -case_r, 0 };
+    total += 1;
+    i = n;
+    while (i > 1) : (i -= 1) {
+        buf[total] = .{ -q[i - 1][0], q[i - 1][1] };
+        total += 1;
+    }
+    std.mem.reverse(V2, buf[0..total]);
+    return total;
+}
+
+/// Height of the case top at a point of the outline: flat over the case,
+/// sloping down along each lug toward its tip.
+fn caseTop(p: V2) f32 {
+    const along = std.math.clamp((@abs(p[1]) - 17.6) / (lug_tip - 17.6), 0, 1);
+    const on_lug = std.math.clamp((@abs(p[0]) - (lug_inner - 1.3)) / 1.2, 0, 1);
+    return mid_top - 1.5 * along * on_lug;
+}
+
+fn caseSolid(m: *Mesh) void {
+    var outline: [1024]V2 = undefined;
+    const n = caseOutline(&outline);
+    const count: u32 = @intCast(n);
+    var ring: [1024]V2 = undefined;
     const first = m.nv + 1;
+
+    // Bottom chamfer, then the straight wall.
+    geo.inset(outline[0..n], ring[0..n], 0.45);
+    for (ring[0..n]) |p| _ = m.v(.{ p[0], p[1], 0 });
+    for (outline[0..n]) |p| _ = m.v(.{ p[0], p[1], 0.5 });
+    // Rounded top edge: a quarter circle of radius edge_round.
+    const steps: u32 = 5;
     var k: u32 = 0;
-    while (k <= n) : (k += 1) {
-        const t = @as(f32, @floatFromInt(k)) / @as(f32, @floatFromInt(n));
-        const y = y0 + (lug_tip - y0) * t;
-        var x_out = lugOuterEdge(y);
-        // The top falls gently along the lug, then rolls over into the tip.
-        const fall = std.math.clamp((y - 15.5) / (lug_tip - 15.5), 0, 1);
-        var top = 5.75 - 1.2 * fall * fall;
-        const into_roll = y - (lug_tip - roll);
-        if (into_roll > 0) {
-            const q = into_roll / roll;
-            top -= 2.6 * (1.0 - @sqrt(@max(0.0, 1.0 - q * q)));
-            x_out -= 0.5 * q * q;
-        }
-        const section = lugSection(&buf, lug_inner, x_out, @max(top, 1.2), @min(1.1, @max(top, 1.2) * 0.4));
-        for (section) |q| _ = m.v(.{ sx * q[0], sy * y, q[1] });
+    while (k <= steps) : (k += 1) {
+        const th = (tau / 4.0) * @as(f32, @floatFromInt(k)) / @as(f32, @floatFromInt(steps));
+        geo.inset(outline[0..n], ring[0..n], edge_round * (1.0 - @cos(th)));
+        for (ring[0..n], outline[0..n]) |p, o| _ = m.v(.{ p[0], p[1], caseTop(o) - edge_round * (1.0 - @sin(th)) });
     }
-    const ns: u32 = 10;
-    k = 0;
-    while (k < n) : (k += 1) {
-        var j: u32 = 0;
-        while (j < ns) : (j += 1) {
-            const jn = (j + 1) % ns;
-            m.quad(first + k * ns + j, first + k * ns + jn, first + (k + 1) * ns + jn, first + (k + 1) * ns + j);
+    // Top surface running in under the bezel. Over the lugs it runs straight
+    // back along the lug (so the lug top is one clean slope); elsewhere it
+    // runs radially in.
+    for (outline[0..n]) |p| {
+        const r = @sqrt(p[0] * p[0] + p[1] * p[1]);
+        if (@abs(p[0]) < 16.5 and @abs(p[1]) > 15.5) {
+            const x = p[0];
+            _ = m.v(.{ x, std.math.sign(p[1]) * @sqrt(17.9 * 17.9 - x * x), mid_top });
+        } else {
+            const s = @min(1.0, 17.9 / r);
+            _ = m.v(.{ p[0] * s, p[1] * s, mid_top });
         }
     }
-    m.ngon(first, ns, true);
-    m.ngon(first + n * ns, ns, false);
+    const rings: u32 = 2 + steps + 1 + 1;
+    var r: u32 = 0;
+    while (r + 1 < rings) : (r += 1) {
+        var i: u32 = 0;
+        while (i < count) : (i += 1) {
+            const j = (i + 1) % count;
+            m.quad(first + r * count + i, first + r * count + j, first + (r + 1) * count + j, first + (r + 1) * count + i);
+        }
+    }
+    m.ngon(first, count, true);
 }
 
 /// A torus whose tube cross-section is given in polar form by `radius(phi, psi)`.
@@ -268,7 +339,8 @@ const DialSlab = struct {
     }
     pub fn top(s: DialSlab, u: f32, v: f32) V3 {
         const p = xy(u, v);
-        return .{ p[0], p[1], dial_z + relief * s.map.sample(u, v) };
+        const k: f32 = if (s.variant == .study) art else 1.0;
+        return .{ p[0], p[1], dial_z + relief * s.map.sample(0.5 + (u - 0.5) / k, 0.5 + (v - 0.5) / k) };
     }
     pub fn bottom(_: DialSlab, u: f32, v: f32) V3 {
         const p = xy(u, v);
@@ -329,13 +401,13 @@ fn studyDial(m: *Mesh, gpa: std.mem.Allocator, io: std.Io) !void {
     for (0..6) |i| {
         if (i == 3) continue;
         const deg = 60.0 * @as(f32, @floatFromInt(i));
-        prism(m, &clockAll(4, .{ .{ -0.15, 11.3 }, .{ 0.15, 11.3 }, .{ 0.15, 13.6 }, .{ -0.15, 13.6 } }, deg), 6.15, 0.02, 1.0);
+        prism(m, &clockAll(4, .{ .{ -0.15, 11.3 * art }, .{ 0.15, 11.3 * art }, .{ 0.15, 13.6 * art }, .{ -0.15, 13.6 * art } }, deg), 6.15, 0.02, 1.0);
     }
 
     // Small polished batons at 3 and 9, between the chambers.
     m.object("polished");
     for ([_]f32{ 90, 270 }) |deg| {
-        prism(m, &clockAll(4, .{ .{ -0.22, 11.7 }, .{ 0.22, 11.7 }, .{ 0.22, 14.0 }, .{ -0.22, 14.0 } }, deg), dial_z + relief - 0.05, 0.3, 0.9);
+        prism(m, &clockAll(4, .{ .{ -0.22, 11.7 * art }, .{ 0.22, 11.7 * art }, .{ 0.22, 14.0 * art }, .{ -0.22, 14.0 * art } }, deg), dial_z + relief - 0.05, 0.3, 0.9);
     }
 
     // Brass cartridge head sitting in the sixth chamber, with its own collar.
