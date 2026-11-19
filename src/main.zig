@@ -9,6 +9,7 @@
 const std = @import("std");
 const geo = @import("geo.zig");
 const diver = @import("diver.zig");
+const chamber = @import("chamber.zig");
 
 pub fn main(init: std.process.Init) !void {
     const io = init.io;
@@ -28,6 +29,10 @@ pub fn main(init: std.process.Init) !void {
     var mesh = geo.Mesh{ .gpa = gpa };
     if (std.mem.eql(u8, model, "diver")) {
         diver.build(&mesh, wrist);
+    } else if (std.mem.eql(u8, model, "chamber")) {
+        try chamber.build(&mesh, gpa, io, .study, wrist);
+    } else if (std.mem.eql(u8, model, "impact")) {
+        try chamber.build(&mesh, gpa, io, .impact, wrist);
     } else {
         std.debug.print("unknown model '{s}' (diver, chamber, impact)\n", .{model});
         return error.UnknownModel;

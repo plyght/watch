@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Breach exploration board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F7F7F5;--ink:#101010;--mute:#6d6d69;--line:#dcdcd7;--card:#FFFFFF;--brass:#C9A24A}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif;font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1600px;margin:0 auto;padding:48px 56px 64px}
+header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1px solid var(--ink);padding-bottom:18px;margin-bottom:36px}
+.wm{font-family:"Instrument Sans",Inter,sans-serif;font-weight:600;font-size:22px;letter-spacing:-.01em}
+h1{font-family:"Instrument Sans",Inter,sans-serif;font-weight:500;font-size:44px;letter-spacing:-.02em;line-height:1.05;margin-top:6px}
+.meta{text-align:right;color:var(--mute);font-size:12px;line-height:1.7}
+.lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);font-weight:500}
+h2{font-family:"Instrument Sans",Inter,sans-serif;font-weight:500;font-size:20px;letter-spacing:-.01em;margin:0 0 4px}
+section{margin-bottom:44px}
+.sechead{display:flex;gap:16px;align-items:baseline;margin-bottom:16px}
+.sechead .n{font-variant-numeric:tabular-nums;color:var(--mute);font-size:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.card{background:var(--card);border:1px solid var(--line);padding:20px}
+.card.rec{border:1.5px solid var(--ink)}
+.card svg{display:block;width:100%;height:auto;background:#ECECE8}
+.card h3{font-family:"Instrument Sans",Inter,sans-serif;font-weight:500;font-size:18px;margin:14px 0 2px;display:flex;justify-content:space-between;align-items:baseline}
+.tag{font-family:Inter;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border:1px solid var(--ink)}
+.tag.on{background:var(--ink);color:var(--bg)}
+.tag.off{color:var(--mute);border-color:var(--line)}
+.card p{color:#333;margin-top:6px}
+.loud{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:12px}
+.loud b{font-weight:600}
+.hero{display:grid;grid-template-columns:1fr 380px;gap:20px}
+.hero .big{background:#ECECE8;border:1px solid var(--line)}
+.hero .big svg{display:block;width:100%;height:auto}
+.side{display:flex;flex-direction:column;gap:20px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+td{padding:7px 0;border-bottom:1px solid var(--line);vertical-align:top}
+td:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:500}
+.sw{display:grid;grid-template-columns:repeat(8,1fr);gap:14px}
+.sw .chip{height:110px;border:1px solid rgba(0,0,0,.12)}
+.sw .name{font-weight:500;margin-top:8px;font-size:12.5px}
+.sw .use{color:var(--mute);font-size:11.5px;line-height:1.4}
+.grid2{display:grid;grid-template-columns:1.25fr 1fr;gap:20px}
+.rules{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.rules ul{list-style:none}
+.rules li{padding:7px 0 7px 18px;border-bottom:1px solid var(--line);position:relative}
+.rules li:before{position:absolute;left:0;top:7px;font-weight:600}
+.yes li:before{content:"+"}
+.no li:before{content:"–";color:#9a9a95}
+.note{color:var(--mute);font-size:12px;margin-top:12px}
+footer{border-top:1px solid var(--line);padding-top:14px;color:var(--mute);font-size:11.5px;display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <div class="wm">semicentric</div>
+    <h1>Breach — exploration board</h1>
+  </div>
+  <div class="meta">one-off mechanical diver · design study v1<br>for review before modelling · all dimensions in mm<br>companion to design/spec.md</div>
+</header>
+
+<section>
+  <div class="sechead"><span class="n">01</span><h2>Directions</h2><span class="lbl">classic silhouette, one loud feature</span></div>
+  <div class="grid3">
+    <div class="card"><svg id="dirA" viewBox="-30 -33 60 66"></svg>
+      <h3>A · Impact <span class="tag off">in progress</span></h3>
+      <p>Chamber case, twisted hex bezel, spider-web crack engraved from an off-centre point, gold emblem over a small balance aperture.</p>
+      <div class="loud"><b>Verdict:</b> the material mix is right. But the dial reads as <i>damage</i>, the crack field fights the feature, the gold emblem is the logo stuck on, and the hex bezel echoes Derschutze's rope.</div>
+    </div>
+    <div class="card"><svg id="dirB" viewBox="-30 -33 60 66"></svg>
+      <h3>B · Tumbler <span class="tag off">alternative</span></h3>
+      <p>Safe-door diver. The bezel is engraved like a combination dial, and a seconds-driven brass wheel passes under a fixed fence window.</p>
+      <div class="loud"><b>Loud feature:</b> once a minute the gate lines up: <i>unlocked</i>. It moves and it's charming, but it's literal security merch with no semicentric DNA.</div>
+    </div>
+    <div class="card rec"><svg id="dirC" viewBox="-30 -33 60 66"></svg>
+      <h3>C · Breach <span class="tag on">recommended</span></h3>
+      <p>The dial plate is torn open from inside, right over the beating balance at 7. Five petals fold outward in the emblem's geometry, and the long blade becomes the 2 o'clock index.</p>
+      <div class="loud"><b>Loud feature:</b> a sculpted brass-edged burst with the live balance in its heart. The emblem is <i>formed</i>, never printed.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sechead"><span class="n">02</span><h2>Recommended: Breach</h2><span class="lbl">front view, 10:15, part callouts</span></div>
+  <div class="hero">
+    <div class="big"><svg id="hero" viewBox="-78 -49.5 156 99"></svg></div>
+    <div class="side">
+      <div class="card">
+        <div class="lbl" style="margin-bottom:8px">Key dimensions</div>
+        <table>
+          <tr><td>Case diameter</td><td>41.0</td></tr>
+          <tr><td>Bezel diameter</td><td>40.5</td></tr>
+          <tr><td>Thickness (incl. dome)</td><td>11.6</td></tr>
+          <tr><td>Lug-to-lug</td><td>48.0</td></tr>
+          <tr><td>Lug width / clasp</td><td>20 → 18</td></tr>
+          <tr><td>Crystal (visible)</td><td>Ø 31.0</td></tr>
+          <tr><td>Crown</td><td>Ø 7.0 × 4.0</td></tr>
+          <tr><td>Breach centre</td><td>r 7.5 @ 7:00</td></tr>
+          <tr><td>Small seconds</td><td>Ø 7.5 @ 4:30</td></tr>
+          <tr><td>Movement</td><td>Miyota 82S5</td></tr>
+          <tr><td>Est. build cost</td><td>≈ $1,250</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <div class="lbl" style="margin-bottom:8px">Profile from 3 o'clock</div>
+        <svg id="profile" viewBox="-30 -4 60 22" style="background:#ECECE8"></svg>
+        <p class="note">Straight 4.2 flank, no crown guards. The "has some sides" of the Chamber, kept under 12.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sechead"><span class="n">03</span><h2>Materials &amp; finishes</h2><span class="lbl">three metals, one warm note</span></div>
+  <div class="sw">
+    <div><div class="chip" style="background:repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 1px,transparent 1px 3px),radial-gradient(circle at 70% 30%,#8d9093 0,#5a5d60 35%,#3c3e40 80%)"></div><div class="name">Aged gunmetal</div><div class="use">case, bezel, bracelet · recesses black, high points worn bright</div></div>
+    <div><div class="chip" style="background:linear-gradient(115deg,#7d8185 0%,#eef0f1 38%,#9ea2a6 52%,#f8f9f9 70%,#6f7377 100%)"></div><div class="name">Worn-bright steel</div><div class="use">lug chamfers, bezel teeth tips, crown flutes</div></div>
+    <div><div class="chip" style="background:linear-gradient(120deg,#7a5a1e 0%,#e9cf86 35%,#b88d33 55%,#f3dc98 72%,#8a6826 100%)"></div><div class="name">Polished brass</div><div class="use">petal edges &amp; undersides, bezel pip, seconds hand</div></div>
+    <div><div class="chip" style="background:radial-gradient(circle at 40% 40%,#dcdedf,#bfc1c3 70%,#aeb0b2)"></div><div class="name">Matte silver</div><div class="use">chapter ring, small seconds disc (bead-blast)</div></div>
+    <div><div class="chip" style="background:repeating-radial-gradient(circle at 28% 72%,#1a1a1a 0 2px,#101010 2px 4px)"></div><div class="name">Blackened dial</div><div class="use">cast brass, eccentric engine-turning centred on the breach</div></div>
+    <div><div class="chip" style="background:repeating-radial-gradient(circle at 50% 50%,#d2d4d5 0 1px,#bcbec0 1px 2.5px)"></div><div class="name">Snailed silver</div><div class="use">small seconds sub-dial, concentric on its own pivot</div></div>
+    <div><div class="chip" style="background:linear-gradient(90deg,#EDEDE6 0 50%,#0d1626 50%);position:relative"><div style="position:absolute;right:16%;top:30%;width:18%;height:40%;background:#7fb7ff;filter:blur(6px);opacity:.9"></div><div style="position:absolute;right:20%;top:36%;width:10%;height:28%;background:#d8ecff"></div></div><div class="name">Lume BGW9</div><div class="use">off-white by day, cool blue at night</div></div>
+    <div><div class="chip" style="background:linear-gradient(160deg,rgba(255,255,255,.7),rgba(210,225,235,.25) 45%,rgba(255,255,255,.55)),#cfd6da"></div><div class="name">Sapphire</div><div class="use">double-domed front, Ø 18 caseback window</div></div>
+  </div>
+</section>
+
+<section>
+  <div class="grid2">
+    <div class="card">
+      <div class="sechead" style="margin-bottom:10px"><span class="n">04</span><h2>Bracelet: Chamber band, re-engraved</h2></div>
+      <svg id="band" viewBox="0 0 120 52" style="background:#ECECE8;display:block;width:100%;height:auto"></svg>
+      <p class="note">Same three-row construction, plain outer links, raised centre plaques (8.5 wide, +0.4). Only the engraving changes: scroll filigree becomes <b style="color:#101010">shard filigree</b>. Each motif radiates from an off-centre seed point, and plaques alternate mirrored. Relief 0.3, recesses blackened, high points worn bright. Pitch 8.0, thickness 3.8, tapering 20 → 18. The wordmark sits only inside the clasp blade.</p>
+    </div>
+    <div class="card">
+      <div class="sechead" style="margin-bottom:10px"><span class="n">05</span><h2>Logo discipline</h2></div>
+      <div class="rules">
+        <div><div class="lbl" style="margin-bottom:6px">may appear</div>
+          <ul class="yes">
+            <li>Emblem as <b>geometry</b>: the breach petals</li>
+            <li>Off-centre seed logic in bracelet filigree</li>
+            <li>Wordmark engraved on the caseback ring</li>
+            <li>Wordmark inside the clasp blade</li>
+          </ul></div>
+        <div><div class="lbl" style="margin-bottom:6px">may not</div>
+          <ul class="no">
+            <li>Printed or applied emblem, anywhere</li>
+            <li>Wordmark on dial, bezel, flanks, lugs</li>
+            <li>Logo on the crown</li>
+            <li>Red seconds or any second brand colour</li>
+          </ul></div>
+      </div>
+      <p class="note">The story already is the logo. Printing it next to the breach would explain the joke.</p>
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)">
+        <div class="lbl" style="margin-bottom:6px">caseback ring engraving</div>
+        <div style="font-family:Inter;font-size:15px;letter-spacing:.02em">semicentric · answers to you · 01/01</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer><span>semicentric · Breach · v1</span><span>front views are design sketches, not renders: proportions to scale, finishes indicative</span></footer>
+</div>
+
+<script>
+const R=Math.PI/180;
+const P=(a,r,c=[0,0])=>[c[0]+r*Math.sin(a*R),c[1]-r*Math.cos(a*R)];
+const f=n=>(+n).toFixed(3);
+const pt=p=>f(p[0])+','+f(p[1]);
+const EMB=["M115 251.5 L126 248.5 L250 174.5 L137 194 L116 238Z","M57 262.5 L87.5 266 L98.5 263.5 L64.5 244Z","M125.5 265.5 L160 278 L471 256 L147 255.5Z","M41 303.5 L65.5 326.5 L105.5 290 L105.5 276.5Z","M203.5 336.5 L129.5 285.5 L129.5 294 L168.5 337.5Z"];
+let uid=0;
+
+function defs(id){return `<defs>
+<radialGradient id="gm${id}" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#8a8d90"/><stop offset=".45" stop-color="#55585b"/><stop offset="1" stop-color="#2e3032"/></radialGradient>
+<linearGradient id="gml${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c7f82"/><stop offset=".5" stop-color="#4a4d50"/><stop offset="1" stop-color="#2c2e30"/></linearGradient>
+<radialGradient id="bz${id}" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="#6c6f72"/><stop offset="1" stop-color="#36383a"/></radialGradient>
+<linearGradient id="sil${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e2e4e5"/><stop offset=".5" stop-color="#c3c5c7"/><stop offset="1" stop-color="#a9abad"/></linearGradient>
+<linearGradient id="br${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f1d88f"/><stop offset=".5" stop-color="#c49a3e"/><stop offset="1" stop-color="#8a6826"/></linearGradient>
+<linearGradient id="pet${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a3a3a"/><stop offset="1" stop-color="#121212"/></linearGradient>
+<linearGradient id="hand${id}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#f4f5f5"/><stop offset=".5" stop-color="#bfc2c4"/><stop offset="1" stop-color="#8d9093"/></linearGradient>
+<clipPath id="dc${id}"><circle r="13.7"/></clipPath>
+<filter id="sh${id}" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx=".25" dy=".35" stdDeviation=".25" flood-opacity=".55"/></filter>
+<filter id="csh${id}" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx=".4" dy=".9" stdDeviation=".9" flood-opacity=".28"/></filter>
+</defs>`}
+
+function bracelet(id,plaque){
+  let s='';
+  for(const dir of [-1,1]){
+    for(let k=0;k<5;k++){
+      const y0=dir<0? -17-8*(k+1) : 17+8*k;
+      const w=10-Math.min(k,3)*.35;
+      s+=`<rect x="${-w}" y="${y0}" width="${2*w}" height="8" fill="${k?`url(#gml${id})`:'#34363a'}" stroke="#1d1e20" stroke-width=".2"/>`;
+      s+=`<rect x="${-4.25}" y="${y0+.6}" width="8.5" height="6.8" fill="#4b4e51" stroke="#9a9da0" stroke-width=".2"/>`;
+      if(plaque) s+=plaque(-4.25,y0+.6,8.5,6.8,(k+(dir>0?1:0))%2,id);
+      s+=`<line x1="${-w}" y1="${y0}" x2="${w}" y2="${y0}" stroke="#1d1e20" stroke-width=".3"/>`;
+    }
+  }
+  return s;
+}
+function shardFil(x,y,w,h,mir,id){
+  // blades radiating from an off-centre seed near lower-left corner
+  const seed=[.18,.78];
+  const blades=[[-70,.95,.10],[-48,1.1,.09],[-28,1.05,.085],[-8,.9,.08],[12,.7,.07],[-88,.6,.07],[-60,.45,.06],[-18,.5,.06],[32,.4,.05],[-108,.35,.05]];
+  let g=`<g clip-path="url(#pc${++uid})"><clipPath id="pc${uid}"><rect x="${x}" y="${y}" width="${w}" height="${h}"/></clipPath><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#2a2b2c"/>`;
+  const L=Math.max(w,h);
+  for(const [a0,len,wid] of blades){
+    const a=(a0+90)*R; // direction
+    let sx=x+(mir? 1-seed[0]:seed[0])*w, sy=y+seed[1]*h;
+    let dx=Math.cos(a)*(mir?-1:1), dy=-Math.sin(a);
+    const ex=sx+dx*len*L, ey=sy+dy*len*L;
+    const nx=-dy*wid*L/2, ny=dx*wid*L/2;
+    const off=.06*L;
+    const bx=sx+dx*off, by=sy+dy*off;
+    g+=`<path d="M${f(bx+nx)},${f(by+ny)} L${f(ex)},${f(ey)} L${f(bx-nx)},${f(by-ny)}Z" fill="#a9acaf" stroke="#d9dbdc" stroke-width=".08"/>`;
+    // secondary barb
+    const mx=sx+dx*len*L*.55, my=sy+dy*len*L*.55;
+    const b2=a+(mir?-1:1)*0.0;
+    const sdx=Math.cos(a+.55)*(mir?-1:1), sdy=-Math.sin(a+.55);
+    g+=`<path d="M${f(mx)},${f(my)} L${f(mx+sdx*.22*L)},${f(my+sdy*.22*L)} L${f(mx+dx*.06*L)},${f(my+dy*.06*L)}Z" fill="#8f9295"/>`;
+  }
+  g+=`<circle cx="${f(x+(mir?1-seed[0]:seed[0])*w)}" cy="${f(y+seed[1]*h)}" r="${f(.05*L)}" fill="#c9cbcd"/></g>`;
+  return g;
+}
+function caseBody(id){
+  let s='';
+  for(const sy of [-1,1]){
+    const q=(x,y)=>`${x},${y*sy}`;
+    for(const sx of [-1,1]){
+      const Q=(x,y)=>`${f(x*sx)},${f(y*sy)}`;
+      s+=`<path d="M${Q(10,8)} L${Q(10,24)} L${Q(15.5,24)} Q${Q(16.4,16)} ${Q(18.9,8)} Z" fill="url(#gml${id})" stroke="#202224" stroke-width=".2"/>`;
+      s+=`<path d="M${Q(15.5,24)} Q${Q(16.4,16)} ${Q(18.9,8)}" stroke="${sx<0?'#eef0f1':'#c9ccce'}" stroke-width=".6" fill="none" opacity=".8"/>`;
+      s+=`<path d="M${Q(10.25,24)} L${Q(10.25,15)}" stroke="#1a1b1d" stroke-width=".35" fill="none" opacity=".7"/>`;
+    }
+    s+=`<line x1="-15.5" y1="${24*sy}" x2="-10" y2="${24*sy}" stroke="#bfc2c4" stroke-width=".3"/><line x1="10" y1="${24*sy}" x2="15.5" y2="${24*sy}" stroke="#bfc2c4" stroke-width=".3"/>`;
+  }
+  // crown
+  s+=`<rect x="20" y="-1.6" width="1.4" height="3.2" fill="#4a4d50"/>`;
+  s+=`<rect x="21.2" y="-3.5" width="4" height="7" fill="url(#gml${id})" stroke="#202224" stroke-width=".2"/>`;
+  for(let i=0;i<7;i++){const y=-3.1+i*1.03;s+=`<line x1="21.3" y1="${f(y)}" x2="25.1" y2="${f(y)}" stroke="${i%2?'#25272a':'#c9cccf'}" stroke-width=".32"/>`}
+  s+=`<circle r="20.5" fill="url(#gm${id})" stroke="#202224" stroke-width=".2"/>`;
+  return s;
+}
+function sawBezel(id){
+  let d=`M${pt(P(0,19.65))}`;
+  for(let i=0;i<60;i++){const a=i*6;d+=` L${pt(P(a,20.3))} L${pt(P(a+6,19.65))}`}
+  let s=`<path d="${d}Z" fill="#3e4043" stroke="#1d1e20" stroke-width=".12"/>`;
+  for(let i=0;i<60;i++){s+=`<line x1="${f(P(i*6,19.65)[0])}" y1="${f(P(i*6,19.65)[1])}" x2="${f(P(i*6,20.3)[0])}" y2="${f(P(i*6,20.3)[1])}" stroke="#c7cacc" stroke-width=".14"/>`}
+  s+=`<circle r="19.55" fill="url(#bz${id})"/><circle r="15.85" fill="#1c1d1e"/>`;
+  for(let i=0;i<60;i++){const a=i*6;if(i%10===0&&i)continue;const long=i%5===0||i<15;const [x1,y1]=P(a,19.2),[x2,y2]=P(a,long?18.2:18.7);s+=`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="#15161a" stroke-width="${long?.38:.22}"/>`}
+  for(const n of [10,20,30,40,50]){const a=n*6;const [x,y]=P(a,17.75);const rot=(a>90&&a<270)?a+180:a;s+=`<text x="${f(x)}" y="${f(y)}" transform="rotate(${rot} ${f(x)} ${f(y)})" font-family="Instrument Sans,Inter,sans-serif" font-size="2.25" font-weight="600" fill="#141518" text-anchor="middle" dominant-baseline="central">${n}</text>`}
+  s+=`<polygon points="${pt(P(-4.2,19.3))} ${pt(P(4.2,19.3))} ${pt(P(0,16.8))}" fill="url(#br${id})" stroke="#6b5120" stroke-width=".12"/><circle cx="0" cy="-18.35" r=".42" fill="#EDEDE6"/>`;
+  return s;
+}
+function chapter(id,ticks=true){
+  let s=`<circle r="15.75" fill="url(#sil${id})"/><circle r="15.75" fill="none" stroke="#8d8f91" stroke-width=".15"/>`;
+  if(ticks)for(let i=0;i<60;i++){const [x1,y1]=P(i*6,15.45),[x2,y2]=P(i*6,i%5?14.85:14.35);s+=`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="#202124" stroke-width="${i%5?.13:.26}"/>`}
+  return s;
+}
+function hands(id,h=307.5,m=90,lume='#EDEDE6'){
+  const sword=(len,w,ang)=>{const pts=[[0,2.4],[-w*.55,0],[-w,-len*.6],[0,-len],[w,-len*.6],[w*.55,0]];const lp=[[0,-1.5],[-w*.55,-len*.58],[0,-len*.9],[w*.55,-len*.58]];
+    return `<g transform="rotate(${ang})" filter="url(#sh${id})"><polygon points="${pts.map(pt).join(' ')}" fill="url(#hand${id})" stroke="#6d7073" stroke-width=".1"/><polygon points="${lp.map(pt).join(' ')}" fill="${lume}"/></g>`};
+  return sword(9.5,1.0,h)+sword(13.5,.72,m)+`<circle r="1.05" fill="url(#hand${id})" stroke="#6d7073" stroke-width=".1"/><circle r=".35" fill="#555"/>`;
+}
+function marker(a,id,dbl){
+  const sh=(o)=>[P(a-2.9+o,13.35),P(a+2.9+o,13.35),P(a+.9+o,11.2)];
+  if(dbl){return [-2.2,2.2].map(o=>{const q=[P(a-1.6+o,13.35),P(a+1.6+o,13.35),P(a+.5+o,11.0)];return `<polygon points="${q.map(pt).join(' ')}" fill="#EDEDE6" stroke="#b9bcbe" stroke-width=".22" filter="url(#sh${id})"/>`}).join('')}
+  return `<polygon points="${sh(0).map(pt).join(' ')}" fill="#EDEDE6" stroke="#b9bcbe" stroke-width=".22" filter="url(#sh${id})"/>`;
+}
+const B=[-3.75,6.5];
+function breachDial(id){
+  let s=`<circle r="13.7" fill="#131313"/><g clip-path="url(#dc${id})">`;
+  for(let r=.8;r<26;r+=.5)s+=`<circle cx="${B[0]}" cy="${B[1]}" r="${f(r)}" fill="none" stroke="#262626" stroke-width=".13"/>`;
+  s+=`</g>`;
+  // markers
+  for(let hr=0;hr<12;hr++){if(hr===7||hr===2)continue;s+=marker(hr*30,id,hr===0)}
+  // small seconds
+  const S=P(135,7.3);
+  s+=`<circle cx="${f(S[0])}" cy="${f(S[1])}" r="3.85" fill="#0c0c0c"/><circle cx="${f(S[0])}" cy="${f(S[1])}" r="3.7" fill="url(#sil${id})"/>`;
+  for(let r=.4;r<3.6;r+=.28)s+=`<circle cx="${f(S[0])}" cy="${f(S[1])}" r="${f(r)}" fill="none" stroke="#aeb0b2" stroke-width=".07"/>`;
+  for(let i=0;i<12;i++){const [x1,y1]=P(i*30,3.5,S),[x2,y2]=P(i*30,i%3?3.0:2.6,S);s+=`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="#1d1e20" stroke-width="${i%3?.13:.22}"/>`}
+  const sh=P(250,3.3,S);
+  s+=`<line x1="${f(S[0])}" y1="${f(S[1])}" x2="${f(sh[0])}" y2="${f(sh[1])}" stroke="url(#br${id})" stroke-width=".32" stroke-linecap="round" filter="url(#sh${id})"/><circle cx="${f(S[0])}" cy="${f(S[1])}" r=".42" fill="url(#br${id})"/>`;
+  // aperture + balance
+  s+=`<circle cx="${B[0]}" cy="${B[1]}" r="3.25" fill="#0a0a0a"/><circle cx="${B[0]}" cy="${B[1]}" r="3.05" fill="#3a3c3e"/>`;
+  s+=`<g transform="translate(${B[0]} ${B[1]})"><path d="M-2.9,-.6 L2.9,-1.6 L2.9,.2 L-2.9,1.2Z" fill="#6f7275" opacity=".7"/>`;
+  let sp='M0,0';for(let t=0;t<34;t+=.25){const r=.25+t*.045;sp+=` L${f(r*Math.cos(t))},${f(r*Math.sin(t))}`}
+  s+=`<circle r="2.35" fill="none" stroke="url(#br${id})" stroke-width=".42"/>${[20,140,260].map(a=>`<line x1="0" y1="0" x2="${f(2.3*Math.cos(a*R))}" y2="${f(2.3*Math.sin(a*R))}" stroke="#b89036" stroke-width=".22"/>`).join('')}<path d="${sp}" fill="none" stroke="#c9ccce" stroke-width=".06"/><circle r=".35" fill="#b0233a"/></g>`;
+  // petals: emblem geometry transformed onto balance
+  const T=`translate(${B[0]} ${B[1]}) rotate(-40) scale(0.055) translate(-122 -262)`;
+  s+=`<g transform="${T}">`;
+  // tear slot along long blade lower edge
+  s+=`<path d="M170 281 L460 260" stroke="#7b7e81" stroke-width="9" stroke-linecap="round"/><path d="M170 281 L460 260" stroke="#2a2b2d" stroke-width="4"/>`;
+  s+=`<g filter="url(#sh${id})">`;
+  for(const d of EMB)s+=`<path d="${d}" transform="translate(-5 5)" fill="url(#br${id})" stroke="#7a5a1e" stroke-width="1.2"/>`;
+  s+=`</g>`;
+  for(const d of EMB)s+=`<path d="${d}" fill="url(#pet${id})" stroke="#e3c579" stroke-width="1.6" stroke-linejoin="miter"/>`;
+  s+=`<path d="M380 255.9 L471 256 L380 262.4Z" fill="#EDEDE6"/>`;
+  s+=`</g>`;
+  return s;
+}
+function watchBreach(id){return defs(id)+bracelet(id,shardFil)+`<g filter="url(#csh${id})">`+caseBody(id)+`</g>`+sawBezel(id)+chapter(id)+breachDial(id)+hands(id)+`<circle r="15.75" fill="none" stroke="rgba(255,255,255,.25)" stroke-width=".25"/><path d="M-11,-10 A15,15 0 0 1 4,-14.8" stroke="rgba(255,255,255,.18)" stroke-width="1.6" fill="none" stroke-linecap="round"/>`}
+
+function scrollPlaque(x,y,w,h,mir,id){
+  let g=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#2a2b2c"/>`;
+  const cx=x+w/2,cy=y+h/2;
+  g+=`<path d="M${x+.8},${cy} C${x+2},${y+.8} ${cx},${y+.8} ${cx},${cy} S${x+w-.8},${y+h-.6} ${x+w-.8},${cy}" fill="none" stroke="#a9acaf" stroke-width=".55"/>`;
+  g+=`<circle cx="${x+2.2}" cy="${cy-1}" r="1.1" fill="none" stroke="#a9acaf" stroke-width=".45"/><circle cx="${x+w-2.2}" cy="${cy+1}" r="1.1" fill="none" stroke="#a9acaf" stroke-width=".45"/>`;
+  return g;
+}
+function watchImpact(id){
+  let s=defs(id)+bracelet(id,scrollPlaque)+`<g filter="url(#csh${id})">`+caseBody(id)+`</g>`;
+  // twisted hex bezel
+  s+=`<circle r="20.3" fill="#2f3133"/>`;
+  for(let i=0;i<40;i++){const a=i*9;const q=[P(a,20.25),P(a+6,20.25),P(a+9,16.1),P(a+3,16.1)];s+=`<polygon points="${q.map(pt).join(' ')}" fill="${i%2?'#6b6e71':'#8b8e91'}" stroke="#2a2c2e" stroke-width=".15"/>`}
+  s+=chapter(id);
+  s+=`<circle r="13.7" fill="#121212"/>`;
+  const I=[-2.5,4];
+  let web='';for(let k=0;k<14;k++){const a=k*25.7+7;const e=P(a,22,I);web+=`<line x1="${I[0]}" y1="${I[1]}" x2="${f(e[0])}" y2="${f(e[1])}" stroke="#5a5c5e" stroke-width=".14"/>`}
+  for(const rr of [2.2,4.2,6.8,9.6,13]){let d='';for(let k=0;k<=14;k++){const a=k*25.7+7;const p=P(a,rr*(1+.12*Math.sin(k*1.7)),I);d+=(k?'L':'M')+pt(p)}web+=`<path d="${d}" fill="none" stroke="#4c4e50" stroke-width=".12"/>`}
+  s+=`<g clip-path="url(#dc${id})">${web}</g>`;
+  for(let hr=0;hr<12;hr++){const [x1,y1]=P(hr*30,13.3),[x2,y2]=P(hr*30,11.4);s+=`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="#EDEDE6" stroke-width=".9"/>`}
+  s+=`<circle cx="${I[0]}" cy="${I[1]}" r="2.1" fill="#3a3c3e"/><circle cx="${I[0]}" cy="${I[1]}" r="1.5" fill="none" stroke="url(#br${id})" stroke-width=".3"/>`;
+  s+=`<g transform="translate(${I[0]} ${I[1]}) scale(0.03) translate(-122 -262)">${EMB.map(d=>`<path d="${d}" fill="url(#br${id})"/>`).join('')}</g>`;
+  return s+hands(id);
+}
+function watchTumbler(id){
+  let s=defs(id)+bracelet(id,null)+`<g filter="url(#csh${id})">`+caseBody(id)+`</g>`;
+  s+=`<circle r="20.3" fill="#3e4043"/>`;
+  for(let i=0;i<90;i++){const [x1,y1]=P(i*4,20.3),[x2,y2]=P(i*4,19.7);s+=`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="#c7cacc" stroke-width=".18"/>`}
+  s+=`<circle r="19.6" fill="url(#bz${id})"/><circle r="15.85" fill="#1c1d1e"/>`;
+  for(let i=0;i<100;i++){const a=i*3.6;const [x1,y1]=P(a,19.3),[x2,y2]=P(a,i%5?18.8:18.3);s+=`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="#141518" stroke-width="${i%5?.15:.3}"/>`}
+  for(let n=0;n<100;n+=10){const a=n*3.6;const [x,y]=P(a,17.2);s+=`<text x="${f(x)}" y="${f(y)}" transform="rotate(${a} ${f(x)} ${f(y)})" font-family="Instrument Sans,Inter,sans-serif" font-size="1.6" font-weight="600" fill="#141518" text-anchor="middle" dominant-baseline="central">${n}</text>`}
+  s+=`<polygon points="${pt(P(-3,19.3))} ${pt(P(3,19.3))} ${pt(P(0,17.9))}" fill="url(#br${id})"/>`;
+  s+=chapter(id);
+  s+=`<circle r="13.7" fill="#141414"/>`;
+  for(let r=1;r<13.7;r+=.6)s+=`<circle r="${f(r)}" fill="none" stroke="#202020" stroke-width=".1"/>`;
+  // window at 6
+  const w0=150,w1=210;
+  s+=`<path d="M${pt(P(w0,11))} A11,11 0 0 1 ${pt(P(w1,11))} L${pt(P(w1,7))} A7,7 0 0 0 ${pt(P(w0,7))}Z" fill="url(#br${id})" stroke="#0a0a0a" stroke-width=".4"/>`;
+  for(let a=w0+3;a<w1;a+=4){const [x1,y1]=P(a,10.6),[x2,y2]=P(a,9.9);s+=`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="#6b5120" stroke-width=".18"/>`}
+  s+=`<path d="M${pt(P(186,11))} L${pt(P(186,8.6))} L${pt(P(194,8.6))} L${pt(P(194,11))}" fill="#1a1a1a"/>`;
+  s+=`<rect x="-.35" y="7.4" width=".7" height="3.4" fill="#d6d8da" stroke="#555" stroke-width=".08"/>`;
+  for(let hr=0;hr<12;hr++){if(hr>=5&&hr<=7)continue;const [x1,y1]=P(hr*30,13.3),[x2,y2]=P(hr*30,11.6);s+=`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="#EDEDE6" stroke-width="${hr%3?.7:1.2}"/>`}
+  return s+hands(id);
+}
+document.getElementById('dirA').innerHTML=watchImpact('a');
+document.getElementById('dirB').innerHTML=watchTumbler('b');
+document.getElementById('dirC').innerHTML=watchBreach('c');
+
+// hero with callouts
+(function(){
+  const K=1.32;
+  let s=`<g transform="scale(${K})">${watchBreach('h')}</g>`;
+  const call=(tx,ty,ax,ay,title,sub)=>{
+    ax*=K;ay*=K;const left=tx<0;const kx=left?-36:36;
+    s+=`<polyline points="${f(ax)},${f(ay)} ${kx},${ty} ${tx},${ty}" fill="none" stroke="#101010" stroke-width=".13"/><circle cx="${f(ax)}" cy="${f(ay)}" r=".55" fill="#F7F7F5" stroke="#101010" stroke-width=".2"/>`;
+    s+=`<text x="${tx}" y="${ty-.4}" font-family="Inter,sans-serif" font-size="1.9" font-weight="600" fill="#101010" text-anchor="${left?'start':'end'}">${title}</text>`;
+    sub.split('|').forEach((l,i)=>{s+=`<text x="${tx}" y="${ty+1.9+i*1.95}" font-family="Inter,sans-serif" font-size="1.5" fill="#5f5f5b" text-anchor="${left?'start':'end'}">${l}</text>`});
+  };
+  // left side labels (start-anchored at x=-76)
+  call(-76,-36,-15.5,-12.6,'Sawtooth bezel','60 shard teeth, unidirectional 120-click|engraved + blackened, brass pip at 12');
+  call(-76,-18,-14.6,-2,'Silver chapter ring','matte bead-blast, engraved minute track|no numerals');
+  call(-76,0,-6.2,3.4,'The breach','cast brass petals in emblem geometry|edges + undersides polished brass');
+  call(-76,18,-3.75,6.5,'Open-heart balance','Miyota 82S5, beating at 7 o’clock|the off-centre focal point');
+  call(-76,36,-5.4,11.4,'Eccentric engine-turning','0.5 pitch rings centred on the breach,|not on the hands');
+  // right side (end-anchored at x=76)
+  call(76,-18,10.6,-5.8,'Long petal = 2 o’clock','19 long, lume tip, tear slot beneath|the 7 index is missing: the breach ate it');
+  call(76,0,23.2,0,'Fluted screw-down crown','Ø 7.0 × 4.0, 12 flutes, no crown guards|no logo');
+  call(76,18,6.4,5.6,'Small seconds 4:30','Ø 7.5 snailed silver, brass hand|the “marine” sub-dial');
+  call(76,-36,6.3,-11.4,'Shard markers','applied, lume-filled, tip set 0.9 off-axis|double shard at 12');
+  call(76,36,13,20,'Aged gunmetal 316L','recesses black, high points worn bright|polished 0.8 chamfer on lugs only');
+  document.getElementById('hero').innerHTML=s;
+})();
+
+// profile
+(function(){
+  const id='p';let s=defs(id);
+  const g='#55585b';
+  // y down = towards wrist; draw with top = crystal
+  const Y=t=>14-t; // thickness coordinate -> svg y
+  s+=`<path d="M-24,${Y(6.6)} L-20.5,${Y(7.4)} L-20.5,${Y(3.2)} L-24,${Y(2.3)} Z" fill="url(#gml${id})" stroke="#222" stroke-width=".12"/>`;
+  s+=`<path d="M24,${Y(6.6)} L20.5,${Y(7.4)} L20.5,${Y(3.2)} L24,${Y(2.3)} Z" fill="url(#gml${id})" stroke="#222" stroke-width=".12"/>`;
+  s+=`<rect x="-17" y="${Y(1.6)}" width="34" height="1.6" fill="#4a4d50" stroke="#222" stroke-width=".12"/>`;
+  s+=`<rect x="-20.5" y="${Y(7.4)}" width="41" height="5.8" fill="url(#gml${id})" stroke="#222" stroke-width=".12"/>`;
+  s+=`<line x1="-20.5" y1="${Y(7.4)+.15}" x2="20.5" y2="${Y(7.4)+.15}" stroke="#d9dcde" stroke-width=".25"/>`;
+  // bezel teeth
+  s+=`<rect x="-20.25" y="${Y(9.6)}" width="40.5" height="2.2" fill="#3e4043" stroke="#222" stroke-width=".12"/>`;
+  for(let x=-19.6;x<20;x+=1.3)s+=`<line x1="${f(x)}" y1="${Y(9.5)}" x2="${f(x)}" y2="${Y(7.5)}" stroke="#a7aaad" stroke-width=".14"/>`;
+  s+=`<path d="M-15.5,${Y(9.6)} Q0,${Y(12.4)} 15.5,${Y(9.6)}" fill="rgba(200,215,225,.55)" stroke="#8aa0ad" stroke-width=".14"/>`;
+  // crown end-on
+  s+=`<circle cx="0" cy="${Y(4.5)}" r="3.5" fill="url(#gm${id})" stroke="#222" stroke-width=".12"/>`;
+  for(let i=0;i<12;i++){const [x1,y1]=P(i*30,3.4,[0,Y(4.5)]),[x2,y2]=P(i*30,2.5,[0,Y(4.5)]);s+=`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="#202224" stroke-width=".3"/>`}
+  // dims
+  const tx=(x,y,t,a='middle')=>`<text x="${x}" y="${y}" font-family="Inter" font-size="1.5" fill="#101010" text-anchor="${a}">${t}</text>`;
+  s+=`<line x1="-24" y1="${Y(-1)}" x2="24" y2="${Y(-1)}" stroke="#101010" stroke-width=".1"/><line x1="-24" y1="${Y(-.4)}" x2="-24" y2="${Y(-1.6)}" stroke="#101010" stroke-width=".1"/><line x1="24" y1="${Y(-.4)}" x2="24" y2="${Y(-1.6)}" stroke="#101010" stroke-width=".1"/>`+tx(0,Y(-1)+2,'48.0 lug-to-lug');
+  s+=`<line x1="27" y1="${Y(0)}" x2="27" y2="${Y(11.6)}" stroke="#101010" stroke-width=".1"/><line x1="26.4" y1="${Y(0)}" x2="27.6" y2="${Y(0)}" stroke="#101010" stroke-width=".1"/><line x1="26.4" y1="${Y(11.6)}" x2="27.6" y2="${Y(11.6)}" stroke="#101010" stroke-width=".1"/>`;
+  s+=`<text x="28.6" y="${Y(5.8)}" font-family="Inter" font-size="1.5" fill="#101010" transform="rotate(-90 28.6 ${Y(5.8)})" text-anchor="middle">11.6</text>`;
+  s+=tx(-28.5,Y(10.4),'bezel 2.2','start')+tx(-28.5,Y(5.2),'flank','start');
+  document.getElementById('profile').innerHTML=s;
+})();
+
+// band comparison
+(function(){
+  const id='bd';let s=defs(id);
+  const strip=(ox,plq,title,sub)=>{
+    for(let k=0;k<5;k++){const y=4+k*8;s+=`<rect x="${ox}" y="${y}" width="20" height="8" fill="url(#gml${id})" stroke="#26282a" stroke-width=".15"/><rect x="${ox+5.75}" y="${y+.6}" width="8.5" height="6.8" fill="#4b4e51"/>`+plq(ox+5.75,y+.6,8.5,6.8,k%2,id)+`<line x1="${ox}" y1="${y}" x2="${ox+20}" y2="${y}" stroke="#1d1e20" stroke-width=".3"/><line x1="${ox+.4}" y1="${y+.4}" x2="${ox+.4}" y2="${y+7.6}" stroke="#d6d9db" stroke-width=".3" opacity=".7"/><line x1="${ox+19.6}" y1="${y+.4}" x2="${ox+19.6}" y2="${y+7.6}" stroke="#d6d9db" stroke-width=".3" opacity=".5"/>`}
+    s+=`<text x="${ox+10}" y="49" font-family="Inter" font-size="2" font-weight="600" text-anchor="middle" fill="#101010">${title}</text>`;
+  };
+  strip(6,scrollPlaque,'Chamber: scroll');
+  s+=`<text x="35" y="25" font-family="Inter" font-size="4" text-anchor="middle" fill="#9a9a95">→</text>`;
+  strip(44,shardFil,'Breach: shard filigree');
+  // macro plaque
+  s+=`<g transform="translate(76 6) scale(4.2)">`+shardFil(0,0,8.5,6.8,0,id)+`<rect width="8.5" height="6.8" fill="none" stroke="#9a9da0" stroke-width=".08"/></g>`;
+  s+=`<text x="93.9" y="40" font-family="Inter" font-size="1.7" text-anchor="middle" fill="#5f5f5b">plaque macro: blades radiate from an off-centre seed</text>`;
+  s+=`<text x="93.9" y="42.4" font-family="Inter" font-size="1.7" text-anchor="middle" fill="#5f5f5b">relief 0.3 · recess black · high points bright</text>`;
+  document.getElementById('band').innerHTML=s;
+})();
+</script>
+</body>
+</html>

@@ -343,9 +343,9 @@ pub fn roundedSection(buf: *[8]V2, x0: f32, x1: f32, w0: f32, w1: f32, r: f32) [
 /// top point for u, v in [0, 1]; `ctx.bottom(u, v)` the matching point on the
 /// underside; `ctx.keep(u, v)` false punches a hole (cells are dropped, so
 /// hole edges are stepped at the grid pitch: cover them with a rim).
-/// With `solid` the underside is a full grid too (watertight, for printing);
-/// without it only the outer border gets walls down to the underside, which
-/// is all a render needs and far lighter.
+/// With `solid` the underside is a full grid too and the border gets walls
+/// (watertight, for printing); without it only the top surface is emitted,
+/// which is all a render needs when the edges are hidden under other parts.
 pub fn slab(m: *Mesh, nx: u32, ny: u32, solid: bool, ctx: anytype) void {
     const row = nx + 1;
     const top0 = m.nv + 1;
@@ -405,18 +405,5 @@ pub fn slab(m: *Mesh, nx: u32, ny: u32, solid: bool, ctx: anytype) void {
             const q = border[(k + 1) % n];
             m.quad(top0 + p[1] * row + p[0], bot0 + p[1] * row + p[0], bot0 + q[1] * row + q[0], top0 + q[1] * row + q[0]);
         }
-    } else {
-        const bot0 = m.nv + 1;
-        for (border[0..n]) |p| {
-            _ = m.v(ctx.bottom(@as(f32, @floatFromInt(p[0])) / @as(f32, @floatFromInt(nx)), @as(f32, @floatFromInt(p[1])) / @as(f32, @floatFromInt(ny))));
-        }
-        for (0..n) |k| {
-            const p = border[k];
-            const q = border[(k + 1) % n];
-            const kn: u32 = @intCast((k + 1) % n);
-            m.quad(top0 + p[1] * row + p[0], bot0 + @as(u32, @intCast(k)), bot0 + kn, top0 + q[1] * row + q[0]);
-        }
-        // Close the underside with one face.
-        m.ngon(bot0, @intCast(n), true);
     }
 }

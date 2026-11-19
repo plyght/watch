@@ -26,10 +26,15 @@ HDRI_DIR = os.environ.get(
 
 # view: (camera position, look-at point, lens mm, f-stop)
 VIEWS = {
-    "hero": ((40, -118, 112), (0, 2, 4), 90, 11.0),
-    "face": ((0, -3, 235), (0, 0, 5), 110, 16.0),
-    "side": ((125, -92, 38), (0, 0, 4), 90, 11.0),
-    "wrist": ((-6, -150, 128), (14, -2, 2), 70, 5.6),
+    "hero": ((40, -118, 112), (0, 2, 4), 90, 32.0),
+    "face": ((0, -3, 235), (0, 0, 5), 110, 32.0),
+    "side": ((125, -92, 38), (0, 0, 4), 90, 32.0),
+    "wrist": ((-6, -150, 128), (14, -2, 2), 70, 11.0),
+    # Close on the 4:30 lug, like the client's marked-up photo.
+    "lug": ((78, -92, 34), (14, -19, 3), 120, 32.0),
+    # Straight down, orthographic, framed like the reference product photo
+    # (900 px across = 86 mm, dial centre 2.44 mm above frame centre).
+    "ref": ((0, -2.44, 300), (0, -2.44, 0), 0, 0.0),
 }
 
 LINK_HALF = 1.6  # half the bracelet link thickness, mm
@@ -155,6 +160,41 @@ def antique(name, dark, bright, contrast=1.0, ao_distance=0.6):
     return mat
 
 
+def dial_plate(name, z_ground, z_top):
+    """The chamber dial: black stippled ground where the relief is low, worn
+    gunmetal where it rises (relief comes from the reference photo)."""
+    mat = antique(name, (0.035, 0.035, 0.04), (0.36, 0.36, 0.37), contrast=1.6, ao_distance=0.3)
+    nt = mat.node_tree
+    metal = nt.nodes["Principled BSDF"]
+    out = nt.nodes["Material Output"]
+    ground = nt.nodes.new("ShaderNodeBsdfPrincipled")
+    ground.inputs["Base Color"].default_value = (0.012, 0.012, 0.013, 1)
+    ground.inputs["Roughness"].default_value = 0.7
+    coord = nt.nodes.new("ShaderNodeTexCoord")
+    stipple = nt.nodes.new("ShaderNodeTexNoise")
+    stipple.inputs["Scale"].default_value = 30.0
+    stipple.inputs["Detail"].default_value = 2.0
+    nt.links.new(coord.outputs["Object"], stipple.inputs["Vector"])
+    bump = nt.nodes.new("ShaderNodeBump")
+    bump.inputs["Strength"].default_value = 0.5
+    bump.inputs["Distance"].default_value = 0.02
+    nt.links.new(stipple.outputs["Fac"], bump.inputs["Height"])
+    nt.links.new(bump.outputs["Normal"], ground.inputs["Normal"])
+    geom = nt.nodes.new("ShaderNodeNewGeometry")
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(geom.outputs["Position"], sep.inputs["Vector"])
+    level = nt.nodes.new("ShaderNodeMapRange")
+    level.inputs["From Min"].default_value = z_ground
+    level.inputs["From Max"].default_value = z_top
+    nt.links.new(sep.outputs["Z"], level.inputs["Value"])
+    mix = nt.nodes.new("ShaderNodeMixShader")
+    nt.links.new(level.outputs["Result"], mix.inputs["Fac"])
+    nt.links.new(ground.outputs["BSDF"], mix.inputs[1])
+    nt.links.new(metal.outputs["BSDF"], mix.inputs[2])
+    nt.links.new(mix.outputs["Shader"], out.inputs["Surface"])
+    return mat
+
+
 def glass_material():
     mat, nt, bsdf = node_material("sapphire")
     bsdf.inputs["Transmission Weight"].default_value = 1.0
@@ -174,8 +214,8 @@ def glass_material():
 
 def make_materials():
     steel = (0.74, 0.74, 0.75)
-    gunmetal_dark = (0.025, 0.025, 0.028)
-    gunmetal_bright = (0.52, 0.52, 0.53)
+    gunmetal_dark = (0.07, 0.07, 0.075)
+    gunmetal_bright = (0.66, 0.66, 0.66)
     return {
         # diver
         "brushed": brushed("brushed", steel, 0.28),
@@ -197,13 +237,15 @@ def make_materials():
         # chamber family
         "antique": antique("antique", gunmetal_dark, gunmetal_bright),
         "antique_bezel": antique("antique_bezel", gunmetal_dark, (0.6, 0.6, 0.61), contrast=1.3, ao_distance=0.8),
-        "engraved": antique("engraved", (0.008, 0.008, 0.009), (0.48, 0.48, 0.49), contrast=1.6, ao_distance=0.25),
-        "silver_disc": brushed("silver_disc", (0.80, 0.80, 0.80), 0.3, axis="Z", anisotropy=0.7),
+        "engraved": antique("engraved", (0.006, 0.006, 0.007), (0.42, 0.42, 0.43), contrast=2.2, ao_distance=0.3),
+        "silver_disc": brushed("silver_disc", (0.95, 0.95, 0.95), 0.45, axis="Z", anisotropy=0.5),
+        "dial_plate": dial_plate("dial_plate", 6.74, 6.86),
         "black_disc": principled("black_disc", (0.01, 0.01, 0.01), 0.0, 0.8),
-        "brass": principled("brass", (0.93, 0.72, 0.36), 1.0, 0.2),
+        "brass": principled("brass", (1.0, 0.70, 0.27), 1.0, 0.28),
         "primer": principled("primer", (0.86, 0.80, 0.66), 1.0, 0.25),
         "gold": principled("gold", (1.0, 0.76, 0.33), 1.0, 0.1),
         "case_back": principled("case_back", (0.5, 0.5, 0.51), 1.0, 0.35),
+        "frame": principled("frame", (0.09, 0.09, 0.1), 1.0, 0.22),
         "floor": principled("floor", (0.89, 0.89, 0.87), 0.0, 0.6),
     }
 
@@ -219,12 +261,12 @@ ASSIGN = {
     "bracelet": "bracelet_brushed", "bracelet_mid": "polished",
     # chamber family
     "antique": "antique", "antique_bezel": "antique_bezel", "engraved": "engraved",
-    "silver_disc": "silver_disc", "black_disc": "black_disc", "brass": "brass",
-    "primer": "primer", "gold": "gold", "polished": "polished",
+    "silver_disc": "silver_disc", "dial_plate": "dial_plate", "black_disc": "black_disc", "brass": "brass",
+    "primer": "primer", "gold": "gold", "polished": "polished", "hand_frame": "frame",
 }
 
 # Parts whose hard edges get a small rounded bevel, as machined metal has.
-BEVEL = {"case_mid", "crown", "bezel", "bracelet", "bracelet_mid", "marker_steel", "hand_steel", "antique", "gold", "polished"}
+BEVEL = {"hand_frame", "case_mid", "crown", "bezel", "bracelet", "bracelet_mid", "marker_steel", "hand_steel", "antique", "gold", "polished"}
 
 
 # ---------------------------------------------------------------- scene
@@ -349,7 +391,7 @@ def import_watch(path, mats):
         obj.data.set_sharp_from_angle(angle=math.radians(28 if name != "antique_bezel" else 50))
         if name in BEVEL:
             bevel = obj.modifiers.new("edges", "BEVEL")
-            bevel.width = 0.12 if name in {"marker_steel", "hand_steel", "gold", "polished"} else 0.25
+            bevel.width = 0.08 if name in {"marker_steel", "hand_steel", "hand_frame", "gold", "polished"} else 0.25
             bevel.segments = 3
             bevel.limit_method = "ANGLE"
             bevel.angle_limit = math.radians(35)
@@ -424,23 +466,32 @@ def setup(model, view, samples, size):
         softbox("key", (-260, -30, 160), target, (160, 260), 2.4)
         softbox("strip", (240, 60, 70), target, (50, 300), 3.5)
         softbox("front", (0, -260, 60), target, (320, 80), 1.4)
+        if view == "ref":
+            # A big soft light right behind the camera, like a product shot.
+            softbox("overhead", (0, -40, 520), (0, 0, 0), (700, 700), 0.55)
     if model == "diver":
         diver_extras(mats)
 
     position, target, lens, fstop = VIEWS[view]
     cam = bpy.data.objects.new("camera", bpy.data.cameras.new("camera"))
     cam.data.clip_start, cam.data.clip_end = 1, 20000
-    cam.data.lens = lens
+    if lens == 0:
+        cam.data.type = "ORTHO"
+        cam.data.ortho_scale = 86.0
+    else:
+        cam.data.lens = lens
     cam.location = position
     look_at(cam, target)
     bpy.context.collection.objects.link(cam)
     scene.camera = cam
     focus = bpy.data.objects.new("focus", None)
-    focus.location = (0, 0, 8)
+    focus.location = (14, -19, 3) if view == "lug" else (0, 0, 8)
     bpy.context.collection.objects.link(focus)
-    cam.data.dof.use_dof = True
+    cam.data.dof.use_dof = fstop > 0
     cam.data.dof.focus_object = focus
-    cam.data.dof.aperture_fstop = fstop
+    # Cycles does not scale the aperture with the scene unit, so convert the
+    # f-number by hand for this millimetre scene.
+    cam.data.dof.aperture_fstop = max(fstop, 0.1) * scene.unit_settings.scale_length
 
     scene.render.engine = "CYCLES"
     scene.cycles.device = "CPU"
