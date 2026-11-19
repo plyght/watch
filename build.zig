@@ -14,9 +14,10 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(exe);
 
-    // `zig build run` writes out/watch.obj
+    // `zig build run -- <model> [wrist w d zc]` writes out/<model>.obj
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
+    run_cmd.addPassthruArgs();
     const run_step = b.step("run", "Generate the watch geometry into out/");
     run_step.dependOn(&run_cmd.step);
 
